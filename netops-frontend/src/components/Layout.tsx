@@ -17,6 +17,11 @@ import {
   DesktopOutlined,
   TagsOutlined,
   SafetyCertificateOutlined,
+  AppstoreOutlined,
+  CodeOutlined,
+  BarChartOutlined,
+  ScheduleOutlined,
+  ApiOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { logout, getCurrentUser } from '../services/auth';
@@ -73,6 +78,14 @@ const Layout: React.FC = () => {
     if (path.startsWith('/cmdb')) return ['cmdb'];
     if (path.startsWith('/device/category')) return ['device-category'];
     if (path.startsWith('/device/credentials')) return ['credential-management'];
+    
+    // RPA子菜单项选中状态
+    if (path.startsWith('/rpa/atomic-components')) return ['rpa-atomic-components'];
+    if (path.startsWith('/rpa/process-orchestration')) return ['rpa-process-orchestration'];
+    if (path.startsWith('/rpa/monitoring-analysis')) return ['rpa-monitoring-analysis'];
+    if (path.startsWith('/rpa/task-job-management')) return ['rpa-task-job-management'];
+    if (path.startsWith('/rpa/system-integration')) return ['rpa-system-integration'];
+    
     if (path.startsWith('/rpa')) return ['rpa'];
     if (path.startsWith('/aiops')) return ['aiops'];
     if (path.startsWith('/system')) return ['system'];
@@ -86,6 +99,15 @@ const Layout: React.FC = () => {
       return ['device'];
     }
     if (path.startsWith('/cmdb')) return ['cmdb'];
+    
+    // 为RPA的子路径设置正确的openKeys
+    if (path.startsWith('/rpa/atomic-components')) return ['rpa', 'rpa-atomic-components'];
+    if (path.startsWith('/rpa/process-orchestration')) return ['rpa', 'rpa-process-orchestration'];
+    if (path.startsWith('/rpa/monitoring-analysis')) return ['rpa', 'rpa-monitoring-analysis'];
+    if (path.startsWith('/rpa/task-job-management')) return ['rpa', 'rpa-task-job-management'];
+    if (path.startsWith('/rpa/system-integration')) return ['rpa', 'rpa-system-integration'];
+    if (path.startsWith('/rpa')) return ['rpa'];
+    
     return [];
   };
 
@@ -149,6 +171,111 @@ const Layout: React.FC = () => {
       key: 'rpa',
       icon: <RobotOutlined />,
       label: '自动化RPA',
+      children: [
+        {
+          key: 'rpa-atomic-components',
+          label: '原子功能组件库',
+          icon: <AppstoreOutlined />,
+          children: [
+            {
+              key: 'rpa/atomic-components/device-connections',
+              label: '设备连接组件',
+            },
+            {
+              key: 'rpa/atomic-components/config-management',
+              label: '配置管理组件',
+            },
+            {
+              key: 'rpa/atomic-components/data-collection',
+              label: '数据采集组件',
+            },
+            {
+              key: 'rpa/atomic-components/security-audit',
+              label: '安全审计组件',
+            },
+            {
+              key: 'rpa/atomic-components/alert-reporting',
+              label: '告警与报告组件',
+            },
+          ],
+        },
+        {
+          key: 'rpa-process-orchestration',
+          label: '流程编排引擎',
+          icon: <CodeOutlined />,
+          children: [
+            {
+              key: 'rpa/process-orchestration/visual-designer',
+              label: '可视化流程设计器',
+            },
+            {
+              key: 'rpa/process-orchestration/process-management',
+              label: '流程管理',
+            },
+            {
+              key: 'rpa/process-orchestration/process-execution',
+              label: '流程调度与执行',
+            },
+          ],
+        },
+        {
+          key: 'rpa-monitoring-analysis',
+          label: '执行监控与分析',
+          icon: <BarChartOutlined />,
+          children: [
+            {
+              key: 'rpa/monitoring-analysis/realtime-dashboard',
+              label: '实时监控仪表盘',
+            },
+            {
+              key: 'rpa/monitoring-analysis/execution-history',
+              label: '执行历史分析',
+            },
+            {
+              key: 'rpa/monitoring-analysis/custom-reports',
+              label: '自定义报表与仪表盘',
+            },
+          ],
+        },
+        {
+          key: 'rpa-task-job-management',
+          label: '任务作业管理',
+          icon: <ScheduleOutlined />,
+          children: [
+            {
+              key: 'rpa/task-job-management/job-execution',
+              label: '作业执行控制',
+            },
+            {
+              key: 'rpa/task-job-management/job-scheduling',
+              label: '作业调度管理',
+            },
+            {
+              key: 'rpa/task-job-management/task-queue',
+              label: '任务队列管理',
+            },
+            {
+              key: 'rpa/task-job-management/job-monitoring',
+              label: '作业监控与报告',
+            },
+          ],
+        },
+        {
+          key: 'rpa-system-integration',
+          label: '系统集成',
+          icon: <ApiOutlined />,
+          children: [
+            {
+              key: 'rpa/system-integration/monitoring-integration',
+              label: '监控系统集成',
+            },
+            {
+              key: 'rpa/system-integration/ticket-integration',
+              label: '工单系统集成',
+            },
+          ],
+        },
+      ],
     },
     {
       key: 'aiops',
@@ -223,7 +350,25 @@ const Layout: React.FC = () => {
             } else if (key === 'credential-management') {
               handleMenuClick('/device/credentials');
             } else {
+              // 导航到相应路由，但保持当前展开的菜单状态
+              const currentOpenKeys = [...openKeys];
               handleMenuClick(`/${key}`);
+              
+              // 判断是否是三级菜单项（包含两个斜杠）
+              if (key.split('/').length > 2) {
+                // 确保对应的父级菜单保持展开
+                const parentKey = key.split('/')[0] + '-' + key.split('/')[1];
+                if (!currentOpenKeys.includes('rpa')) {
+                  currentOpenKeys.push('rpa');
+                }
+                if (!currentOpenKeys.includes(parentKey)) {
+                  currentOpenKeys.push(parentKey);
+                }
+                // 使用setTimeout确保在路由切换后依然保持菜单展开状态
+                setTimeout(() => {
+                  setOpenKeys(currentOpenKeys);
+                }, 0);
+              }
             }
           }}
           items={mainMenuItems}

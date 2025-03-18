@@ -80,7 +80,7 @@ const App: React.FC = () => {
             <Route path="category" element={<DeviceCategory />} />
             <Route path="credentials" element={<CredentialManagement />} />
           </Route>
-          <Route path="rpa" element={<RPA />} />
+          <Route path="rpa/*" element={<RPA />} />
           <Route path="aiops" element={<AIOPS />} />
           <Route path="system" element={
             <AdminRoute>
