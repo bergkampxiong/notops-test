@@ -56,6 +56,22 @@ class CredentialUpdate(BaseModel):
     private_key: Optional[str] = None
     passphrase: Optional[str] = None
 
+# 完整凭证响应模型（包含密码）
+class FullCredentialResponse(CredentialBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    username: Optional[str] = None
+    password: Optional[str] = None
+    enable_password: Optional[str] = None
+    api_key: Optional[str] = None
+    api_secret: Optional[str] = None
+    private_key: Optional[str] = None
+    passphrase: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
 # 获取所有凭证
 @router.get("/", response_model=List[CredentialResponse])
 async def get_credentials(
@@ -237,4 +253,20 @@ async def delete_credential(
     
     db.delete(db_credential)
     db.commit()
-    return None 
+    return None
+
+# 获取完整凭证信息（包含密码）
+@router.get("/{credential_id}/full", response_model=FullCredentialResponse)
+async def get_full_credential(
+    credential_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """获取完整的凭证信息（包含密码）"""
+    credential = db.query(Credential).filter(Credential.id == credential_id).first()
+    if not credential:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="凭证不存在"
+        )
+    return credential 

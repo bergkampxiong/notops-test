@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Table,
@@ -1023,6 +1023,7 @@ const MemberDisplay: React.FC = () => {
 // 主设备分类页面组件
 const DeviceCategory: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('category');
+  const menuRef = useRef<any>(null);
   
   const handleTabChange = (key: string) => {
     setActiveTab(key);
@@ -1032,6 +1033,7 @@ const DeviceCategory: React.FC = () => {
     <Layout style={{ minHeight: '100%' }}>
       <Sider width={200} theme="light">
         <Menu
+          ref={menuRef}
           mode="inline"
           selectedKeys={[activeTab]}
           style={{ height: '100%' }}

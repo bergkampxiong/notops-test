@@ -19,6 +19,7 @@ import SSHConfigModal from './atomic-components/device-connections/SSHConfigModa
 import ApiConfigModal from './atomic-components/device-connections/ApiConfigModal';
 import PoolConfigModal from './atomic-components/device-connections/PoolConfigModal';
 import PoolMonitor from './atomic-components/device-connections/PoolMonitor';
+import SSHCodeViewer from './atomic-components/device-connections/SSHCodeViewer';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -51,8 +52,9 @@ const DeviceConnections: React.FC = () => {
   const [sshModalVisible, setSSHModalVisible] = useState(false);
   const [poolConfigModalVisible, setPoolConfigModalVisible] = useState(false);
   const [editingConfig, setEditingConfig] = useState<any>(null);
-  const [form] = Form.useForm();
   const [apiForm] = Form.useForm();
+  const [codeViewerVisible, setCodeViewerVisible] = useState(false);
+  const [selectedConfig, setSelectedConfig] = useState<SSHConfig | null>(null);
   
   // 使用 ref 替代 findDOMNode
   const headersRef = useRef<HTMLTextAreaElement>(null);
@@ -167,7 +169,7 @@ const DeviceConnections: React.FC = () => {
     }
   };
 
-  // 表格列定义
+  // SSH配置表格列定义
   const sshColumns = [
     {
       title: 'SSH连接名称',
@@ -192,25 +194,23 @@ const DeviceConnections: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: SSHConfig) => (
+      render: (_: unknown, record: SSHConfig) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEditSSH(record)}
-          >
+          <Button type="link" onClick={() => handleEditSSH(record)}>
             编辑
           </Button>
-          <Popconfirm
-            title="确定要删除这个SSH配置吗？"
-            onConfirm={() => handleDeleteSSH(record.id)}
-            okText="确定"
-            cancelText="取消"
+          <Button type="link" danger onClick={() => handleDeleteSSH(record.id)}>
+            删除
+          </Button>
+          <Button 
+            type="link" 
+            onClick={() => {
+              setSelectedConfig(record);
+              setCodeViewerVisible(true);
+            }}
           >
-            <Button type="link" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
+            查看代码
+          </Button>
         </Space>
       ),
     },
@@ -429,6 +429,18 @@ const DeviceConnections: React.FC = () => {
             fetchData();
           }}
           initialValues={poolConfig}
+        />
+      )}
+
+      {/* 添加代码查看器 */}
+      {selectedConfig && (
+        <SSHCodeViewer
+          visible={codeViewerVisible}
+          onClose={() => {
+            setCodeViewerVisible(false);
+            setSelectedConfig(null);
+          }}
+          config={selectedConfig}
         />
       )}
     </div>

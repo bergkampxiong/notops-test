@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Layout as AntLayout, Menu, Dropdown, Avatar, Button } from 'antd';
 import type { MenuProps } from 'antd';
 import {
@@ -35,6 +35,7 @@ const Layout: React.FC = () => {
   const [openKeys, setOpenKeys] = useState<string[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
+  const menuRef = useRef<any>(null);
 
   // 获取用户信息
   useEffect(() => {
@@ -336,6 +337,7 @@ const Layout: React.FC = () => {
           }}></div>
         </div>
         <Menu
+          ref={menuRef}
           theme="dark"
           mode="inline"
           selectedKeys={getSelectedKey()}
