@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, Input, Space, Table, Tag, Typography, message, Row, Upload, Modal, Form, Select, Popconfirm, Col, DatePicker } from 'antd';
+import { Button, Card, Input, Space, Table, Tag, Typography, message, Row, Upload, Modal, Form, Select, Popconfirm, Col, DatePicker, Alert, Spin } from 'antd';
 import type { InputRef } from 'antd';
 import type { ColumnType, FilterConfirmProps, FilterDropdownProps } from 'antd/es/table/interface';
 import { 
@@ -66,7 +66,7 @@ const CMDBQuery: React.FC = () => {
   const [vendorOptions, setVendorOptions] = useState<any[]>([]);
   const [statusOptions, setStatusOptions] = useState<any[]>([]);
   const [locationOptions, setLocationOptions] = useState<any[]>([]);
-  const [addDeviceForm] = Form.useForm();
+  const [form] = Form.useForm();
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   const [addDeviceLoading, setAddDeviceLoading] = useState<boolean>(false);
   
@@ -116,17 +116,41 @@ const CMDBQuery: React.FC = () => {
   const fetchAssets = async () => {
     setLoading(true);
     try {
-      // 构建查询参数
-      const params = new URLSearchParams();
-      Object.entries(searchParams).forEach(([key, value]) => {
-        if (value) params.append(key, value.toString());
+      const response = await axios.get('/api/cmdb/assets', {
+        params: {
+          skip: 0,
+          limit: 100,
+          ...searchParams
+        }
       });
-
-      const response = await axios.get('/api/cmdb/assets', { params });
-      setAssets(response.data);
-    } catch (error) {
+      
+      if (response.data && Array.isArray(response.data)) {
+        // 处理数据，确保所有字段都有值
+        const processedData = response.data.map((asset: any) => ({
+          ...asset,
+          model: asset.model || '-',
+          serial_number: asset.serial_number || '-',
+          owner: asset.owner || '-',
+          purchase_cost: asset.purchase_cost !== null ? Number(asset.purchase_cost) : '-',
+          current_value: asset.current_value !== null ? Number(asset.current_value) : '-',
+          online_date: asset.online_date || '-',
+          device_type: asset.device_type || { name: '-' },
+          vendor: asset.vendor || { name: '-' },
+          department: asset.department || { name: '-' },
+          location: asset.location || { name: '-' },
+          status: asset.status || { name: '-' },
+          system_type: asset.system_type || { name: '-' }
+        }));
+        setAssets(processedData);
+        console.log('Processed assets:', processedData); // 添加处理后的数据日志
+      } else {
+        setAssets([]);
+        message.warning('未获取到数据');
+      }
+    } catch (error: any) {
       console.error('获取资产数据失败:', error);
-      message.error('获取资产数据失败');
+      message.error(error.response?.data?.detail || '获取资产数据失败');
+      setAssets([]);
     } finally {
       setLoading(false);
     }
@@ -136,17 +160,50 @@ const CMDBQuery: React.FC = () => {
   const handleSearch = async () => {
     setLoading(true);
     try {
-      // 移除空值
+      // 移除空值并转换数字类型
       const queryParams = Object.fromEntries(
-        Object.entries(searchParams).filter(([_, v]) => v !== undefined && v !== '')
+        Object.entries(searchParams)
+          .filter(([_, v]) => v !== undefined && v !== '')
+          .map(([key, value]) => {
+            // 转换数字类型的字段
+            if (['device_type_id', 'vendor_id', 'department_id', 'location_id', 'status_id', 'system_type_id'].includes(key)) {
+              return [key, parseInt(value as string)];
+            }
+            return [key, value];
+          })
       );
-      
+
+      // 发送查询请求
       const response = await axios.post('/api/cmdb/assets/query', queryParams);
-      setAssets(response.data);
-      message.success(`查询到 ${response.data.length} 条记录`);
-    } catch (error) {
-      message.error('查询失败');
+      
+      if (response.data && Array.isArray(response.data)) {
+        // 处理数据，确保所有字段都有值
+        const processedData = response.data.map((asset: any) => ({
+          ...asset,
+          model: asset.model || '-',
+          serial_number: asset.serial_number || '-',
+          owner: asset.owner || '-',
+          purchase_cost: asset.purchase_cost !== null ? Number(asset.purchase_cost) : '-',
+          current_value: asset.current_value !== null ? Number(asset.current_value) : '-',
+          online_date: asset.online_date || '-',
+          device_type: asset.device_type || { name: '-' },
+          vendor: asset.vendor || { name: '-' },
+          department: asset.department || { name: '-' },
+          location: asset.location || { name: '-' },
+          status: asset.status || { name: '-' },
+          system_type: asset.system_type || { name: '-' }
+        }));
+        setAssets(processedData);
+        message.success(`查询到 ${processedData.length} 条记录`);
+        console.log('Processed search results:', processedData); // 添加处理后的数据日志
+      } else {
+        setAssets([]);
+        message.warning('未查询到数据');
+      }
+    } catch (error: any) {
       console.error('Search failed:', error);
+      message.error(error.response?.data?.detail || '查询失败');
+      setAssets([]);
     } finally {
       setLoading(false);
     }
@@ -166,7 +223,7 @@ const CMDBQuery: React.FC = () => {
     }
 
     // 创建CSV内容
-    const columnsWithDataIndex = columns.filter(col => col.dataIndex !== undefined && col.dataIndex !== 'actions');
+    const columnsWithDataIndex = columns.filter(col => col.dataIndex !== undefined && col.dataIndex !== 'action');
     
     const headers = columnsWithDataIndex.map(col => col.title);
     
@@ -340,7 +397,7 @@ const CMDBQuery: React.FC = () => {
       await axios.post('/api/cmdb/assets', formattedValues);
       message.success('设备添加成功');
       setAddDeviceModalVisible(false);
-      addDeviceForm.resetFields();
+      form.resetFields();
       fetchAssets(); // 刷新数据
     } catch (error) {
       console.error('添加设备失败:', error);
@@ -449,28 +506,28 @@ const CMDBQuery: React.FC = () => {
     },
     {
       title: '设备类型',
-      dataIndex: 'device_type',
+      dataIndex: ['device_type', 'name'],
       key: 'device_type',
-      render: (deviceType) => deviceType && (
-        <Tag color={deviceTypeColors[deviceType.name] || 'default'}>
-          {deviceType.name}
+      render: (text) => text && (
+        <Tag color={deviceTypeColors[text] || 'default'}>
+          {text}
         </Tag>
       ),
-      filterDropdown: getSelectFilterDropdown('device_type_id', [
-        { text: '服务器', value: '1' },
-        { text: '网络设备', value: '2' },
-        { text: 'K8S节点', value: '3' },
-        { text: 'K8S集群', value: '4' }
-      ]),
+      filterDropdown: getSelectFilterDropdown('device_type_id', deviceTypeOptions.map(type => ({
+        text: type.name,
+        value: type.id.toString()
+      }))),
       filterIcon: (filtered) => <FilterOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
       width: 120,
     },
     {
       title: '厂商',
-      dataIndex: 'vendor',
+      dataIndex: ['vendor', 'name'],
       key: 'vendor',
-      render: (vendor) => vendor && vendor.name,
-      filterDropdown: getTextFilterDropdown('vendor_id'),
+      filterDropdown: getSelectFilterDropdown('vendor_id', vendorOptions.map(vendor => ({
+        text: vendor.name,
+        value: vendor.id.toString()
+      }))),
       filterIcon: (filtered) => <FilterOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
       width: 120,
       ellipsis: true,
@@ -503,11 +560,11 @@ const CMDBQuery: React.FC = () => {
     },
     {
       title: '系统类型',
-      dataIndex: 'system_type',
+      dataIndex: ['system_type', 'name'],
       key: 'system_type',
-      render: (systemType) => systemType && (
-        <Tag color={systemTypeColors[systemType.name] || 'default'}>
-          {systemType.name}
+      render: (text) => text && (
+        <Tag color={systemTypeColors[text] || 'default'}>
+          {text}
         </Tag>
       ),
       filterDropdown: getSelectFilterDropdown('system_type_id', 
@@ -518,26 +575,24 @@ const CMDBQuery: React.FC = () => {
     },
     {
       title: '状态',
-      dataIndex: 'status',
+      dataIndex: ['status', 'name'],
       key: 'status',
-      render: (status) => status && (
-        <Tag color={statusColors[status.name] || 'default'}>
-          {status.name}
+      render: (text) => text && (
+        <Tag color={statusColors[text] || 'default'}>
+          {text}
         </Tag>
       ),
-      filterDropdown: getSelectFilterDropdown('status_id', [
-        { text: '在线', value: '1' },
-        { text: '离线', value: '2' },
-        { text: '维护中', value: '3' }
-      ]),
+      filterDropdown: getSelectFilterDropdown('status_id', statusOptions.map(status => ({
+        text: status.name,
+        value: status.id.toString()
+      }))),
       filterIcon: (filtered) => <FilterOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
       width: 100,
     },
     {
       title: '位置',
-      dataIndex: 'location',
+      dataIndex: ['location', 'name'],
       key: 'location',
-      render: (location) => location && location.name,
       filterDropdown: getSelectFilterDropdown('location_id', 
         locationOptions.map(location => ({ text: location.name, value: location.id.toString() }))
       ),
@@ -555,30 +610,42 @@ const CMDBQuery: React.FC = () => {
       ellipsis: true,
     },
     {
+      title: '所属部门',
+      dataIndex: ['department', 'name'],
+      key: 'department',
+      filterDropdown: getSelectFilterDropdown('department_id', 
+        locationOptions.map(location => ({ text: location.name, value: location.id.toString() }))
+      ),
+      filterIcon: (filtered) => <FilterOutlined style={{ color: filtered ? '#1890ff' : undefined }} />,
+      width: 120,
+      ellipsis: true,
+    },
+    {
       title: '上线时间',
       dataIndex: 'online_date',
       key: 'online_date',
-      render: (date) => date || '-',
+      render: (date) => date && date !== '-' ? moment(date).format('YYYY-MM-DD') : '-',
       width: 120,
     },
     {
       title: '购买成本',
       dataIndex: 'purchase_cost',
       key: 'purchase_cost',
-      render: (cost) => cost ? `¥${cost}` : '-',
+      render: (cost) => cost && cost !== '-' ? `¥${Number(cost).toLocaleString()}` : '-',
       width: 100,
     },
     {
       title: '当前价值',
       dataIndex: 'current_value',
       key: 'current_value',
-      render: (value) => value ? `¥${value}` : '-',
+      render: (value) => value && value !== '-' ? `¥${Number(value).toLocaleString()}` : '-',
       width: 100,
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      render: (date) => moment(date).format('YYYY-MM-DD HH:mm:ss'),
       sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       width: 150,
     },
@@ -586,14 +653,15 @@ const CMDBQuery: React.FC = () => {
       title: '更新时间',
       dataIndex: 'updated_at',
       key: 'updated_at',
+      render: (date) => moment(date).format('YYYY-MM-DD HH:mm:ss'),
       sorter: (a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime(),
       width: 150,
     },
     {
       title: '操作',
-      key: 'actions',
+      key: 'action',
       fixed: 'right',
-      width: 100,
+      width: 120,
       render: (_, record) => (
         <Space size="small">
           <Button 
@@ -602,17 +670,8 @@ const CMDBQuery: React.FC = () => {
             onClick={() => showEditDeviceModal(record)}
           />
           <Popconfirm
-            title="确定要删除这台设备吗?"
-            onConfirm={async () => {
-              try {
-                await axios.delete(`/api/cmdb/assets/${record.id}`);
-                message.success('设备删除成功');
-                fetchAssets(); // 刷新数据
-              } catch (error) {
-                console.error('删除设备失败:', error);
-                message.error('删除设备失败');
-              }
-            }}
+            title="确定要删除此资产吗?"
+            onConfirm={() => handleDeleteDevices()}
             okText="确定"
             cancelText="取消"
           >
@@ -620,7 +679,7 @@ const CMDBQuery: React.FC = () => {
           </Popconfirm>
         </Space>
       ),
-    }
+    },
   ];
 
   // 根据设备类型获取图标
@@ -645,23 +704,72 @@ const CMDBQuery: React.FC = () => {
   // 处理CSV导入
   const handleImport = async (file: File) => {
     setImportLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
 
     try {
-      const response = await axios.post('/api/cmdb/assets/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      message.success(`成功导入 ${response.data.imported} 条记录`);
-      fetchAssets(); // 刷新数据
-      setImportModalVisible(false);
-    } catch (error) {
+      // 检查文件类型
+      if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+        message.error('请上传CSV格式的文件');
+        return false;
+      }
+
+      // 检查文件大小（10MB）
+      if (file.size > 10 * 1024 * 1024) {
+        message.error('文件大小不能超过10MB');
+        return false;
+      }
+
+      // 读取文件内容
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const content = e.target?.result as string;
+          
+          // 将CSV内容发送到后端
+          const response = await axios.post('/api/cmdb/assets/import', 
+            { content },
+            {
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          // 检查响应状态和数据
+          if (response.status === 200) {
+            const { success, imported, failed, errors } = response.data;
+            
+            if (imported > 0) {
+              message.success(`成功导入 ${imported} 条记录${failed > 0 ? `，${failed} 条记录失败` : ''}`);
+              fetchAssets(); // 刷新数据
+              setImportModalVisible(false);
+            } else if (failed > 0) {
+              message.error(`导入失败：${failed} 条记录导入失败${errors ? `，${errors.join('; ')}` : ''}`);
+            } else {
+              message.warning('没有数据被导入');
+            }
+          } else {
+            message.error('导入失败：服务器响应异常');
+          }
+        } catch (error: any) {
+          console.error('导入失败:', error);
+          const errorMessage = error.response?.data?.detail || error.response?.data?.message || '导入失败，请检查数据格式是否正确';
+          message.error(errorMessage);
+        } finally {
+          setImportLoading(false);
+        }
+      };
+
+      reader.onerror = () => {
+        message.error('文件读取失败');
+        setImportLoading(false);
+      };
+
+      // 以文本格式读取文件
+      reader.readAsText(file, 'UTF-8');
+    } catch (error: any) {
       console.error('导入失败:', error);
-      message.error('导入失败，请检查CSV格式是否正确');
-    } finally {
+      const errorMessage = error.response?.data?.detail || error.response?.data?.message || '导入失败，请检查CSV格式是否正确';
+      message.error(errorMessage);
       setImportLoading(false);
     }
     
@@ -669,11 +777,109 @@ const CMDBQuery: React.FC = () => {
   };
 
   // CSV模板示例数据
-  const csvTemplateData = `设备名称,资产标签,设备类型,厂商,型号,IP地址,SN码,系统类型,位置,所有者,所属部门,上线时间,购买成本,当前价值
-Server001,SVR-001,Server,Dell,PowerEdge R740,192.168.1.101,ABCD1234,cisco_ios,机房A,张三,IT部门,2023-01-15,15000,12000
-Switch001,SW-001,Network,Cisco,Catalyst 9300,192.168.1.1,XYZ9876,cisco_ios,机房B,李四,运维部门,2023-02-20,8000,7500
-K8SNode001,K8S-001,K8S Node,HP,ProLiant DL380,192.168.2.101,HP12345,linux,机房A,王五,研发部门,2023-03-10,12000,11000
-K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发部门,2023-04-05,,`;
+  const csvTemplateData = `设备名称,资产标签,设备类型,厂商,型号,IP地址,SN码,系统类型,状态,位置,所有者,所属部门,上线时间,购买成本,当前价值,购买日期,保修到期,备注
+Server001,SVR001,服务器,Dell,PowerEdge R740,192.168.1.101,ABCD1234,linux,在线,机房A,张三,IT部门,2023-01-15,15000,12000,2023-01-01,2024-12-31,测试服务器
+Switch001,SW001,网络设备,Cisco,Catalyst 9300,192.168.1.1,XYZ9876,cisco_ios,在线,机房B,李四,运维部门,2023-02-20,8000,7500,2023-02-01,2024-12-31,核心交换机
+K8SNode001,K8S001,K8S节点,HP,ProLiant DL380,192.168.2.101,HP12345,linux,在线,机房A,王五,研发部门,2023-03-10,12000,11000,2023-03-01,2024-12-31,K8S节点
+K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,研发部门,2023-04-05,,,2023-04-01,2024-12-31,K8S集群`;
+
+  // CSV模板示例模态框
+  const renderCsvTemplateModal = () => (
+    <Modal
+      title="CSV模板示例"
+      open={csvTemplateModalVisible}
+      onCancel={() => setCsvTemplateModalVisible(false)}
+      width={800}
+      styles={{
+        body: { padding: 24 }
+      }}
+      footer={[
+        <Button 
+          key="download" 
+          type="primary"
+          onClick={() => {
+            const blob = new Blob([csvTemplateData], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'cmdb_import_template.csv';
+            link.click();
+            URL.revokeObjectURL(link.href);
+          }}
+        >
+          下载模板
+        </Button>
+      ]}
+    >
+      <div className="csv-template-container">
+        <Alert
+          message="CSV文件格式说明"
+          description={
+            <ul>
+              <li>文件必须是UTF-8编码的CSV格式</li>
+              <li>第一行必须是表头，列名必须与模板一致</li>
+              <li>必填字段：设备名称、资产标签、设备类型、IP地址、系统类型</li>
+              <li>日期格式：YYYY-MM-DD（例如：2023-01-01）</li>
+              <li>金额格式：纯数字，不要包含货币符号（例如：10000）</li>
+              <li>状态字段：默认为"在线"，可选值包括"在线"、"离线"、"维护中"等</li>
+              <li>系统类型：常用值包括 linux、windows、cisco_ios 等</li>
+            </ul>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Table
+          dataSource={csvTemplateData.split('\n').slice(1).map((line, index) => {
+            const values = line.split(',');
+            return {
+              key: index,
+              name: values[0],
+              asset_tag: values[1],
+              device_type: values[2],
+              vendor: values[3],
+              model: values[4],
+              ip_address: values[5],
+              serial_number: values[6],
+              system_type: values[7],
+              status: values[8],
+              location: values[9],
+              owner: values[10],
+              department: values[11],
+              online_date: values[12],
+              purchase_cost: values[13],
+              current_value: values[14],
+              purchase_date: values[15],
+              warranty_expiry: values[16],
+              notes: values[17]
+            };
+          })}
+          columns={[
+            { title: '设备名称', dataIndex: 'name', key: 'name' },
+            { title: '资产标签', dataIndex: 'asset_tag', key: 'asset_tag' },
+            { title: '设备类型', dataIndex: 'device_type', key: 'device_type' },
+            { title: '厂商', dataIndex: 'vendor', key: 'vendor' },
+            { title: '型号', dataIndex: 'model', key: 'model' },
+            { title: 'IP地址', dataIndex: 'ip_address', key: 'ip_address' },
+            { title: 'SN码', dataIndex: 'serial_number', key: 'serial_number' },
+            { title: '系统类型', dataIndex: 'system_type', key: 'system_type' },
+            { title: '状态', dataIndex: 'status', key: 'status' },
+            { title: '位置', dataIndex: 'location', key: 'location' },
+            { title: '所有者', dataIndex: 'owner', key: 'owner' },
+            { title: '所属部门', dataIndex: 'department', key: 'department' },
+            { title: '上线时间', dataIndex: 'online_date', key: 'online_date' },
+            { title: '购买成本', dataIndex: 'purchase_cost', key: 'purchase_cost' },
+            { title: '当前价值', dataIndex: 'current_value', key: 'current_value' },
+            { title: '购买日期', dataIndex: 'purchase_date', key: 'purchase_date' },
+            { title: '保修到期', dataIndex: 'warranty_expiry', key: 'warranty_expiry' },
+            { title: '备注', dataIndex: 'notes', key: 'notes' }
+          ]}
+          scroll={{ x: true }}
+          size="small"
+          pagination={false}
+        />
+      </div>
+    </Modal>
+  );
 
   // 渲染筛选标签
   const renderFilterTags = () => {
@@ -737,6 +943,64 @@ K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发
       </div>
     );
   };
+
+  // CSV导入模态框内容
+  const renderImportModal = () => (
+    <Modal
+      title="导入设备数据"
+      open={importModalVisible}
+      onCancel={() => setImportModalVisible(false)}
+      footer={null}
+      width={600}
+      styles={{
+        body: { padding: 24 }
+      }}
+    >
+      <div style={{ marginBottom: 16 }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Text>请上传符合格式的CSV文件，文件大小不超过10MB。</Text>
+          <Alert
+            message="导入说明"
+            description={
+              <ul style={{ margin: 0, paddingLeft: 16 }}>
+                <li>CSV文件必须包含表头行，且列名必须与模板一致</li>
+                <li>必填字段：设备名称、资产标签、设备类型、IP地址、系统类型</li>
+                <li>日期格式：YYYY-MM-DD</li>
+                <li>金额格式：纯数字，不需要包含货币符号</li>
+              </ul>
+            }
+            type="info"
+            showIcon
+          />
+          <Button 
+            type="link" 
+            icon={<QuestionCircleOutlined />}
+            onClick={() => setCsvTemplateModalVisible(true)}
+          >
+            查看CSV模板示例
+          </Button>
+        </Space>
+      </div>
+      <Upload.Dragger
+        name="file"
+        accept=".csv"
+        beforeUpload={handleImport}
+        showUploadList={false}
+        disabled={importLoading}
+      >
+        <p className="ant-upload-drag-icon">
+          <UploadOutlined />
+        </p>
+        <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
+        <p className="ant-upload-hint">支持单个CSV文件上传</p>
+        {importLoading && (
+          <Spin>
+            <div style={{ padding: '24px 0' }}>正在导入...</div>
+          </Spin>
+        )}
+      </Upload.Dragger>
+    </Modal>
+  );
 
   return (
     <div className="cmdb-query-page">
@@ -818,112 +1082,8 @@ K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发
         />
       </Card>
 
-      {/* CSV导入模态框 */}
-      <Modal
-        title="导入设备数据"
-        open={importModalVisible}
-        onCancel={() => setImportModalVisible(false)}
-        footer={null}
-        width={600}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <Text>请上传符合格式的CSV文件，文件大小不超过10MB。</Text>
-          <Button 
-            type="link" 
-            icon={<QuestionCircleOutlined />}
-            onClick={() => setCsvTemplateModalVisible(true)}
-          >
-            查看CSV模板示例
-          </Button>
-        </div>
-        <Upload.Dragger
-          name="file"
-          accept=".csv"
-          beforeUpload={handleImport}
-          showUploadList={false}
-          disabled={importLoading}
-        >
-          <p className="ant-upload-drag-icon">
-            <UploadOutlined />
-          </p>
-          <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-          <p className="ant-upload-hint">支持单个CSV文件上传</p>
-        </Upload.Dragger>
-      </Modal>
-
       {/* CSV模板示例模态框 */}
-      <Modal
-        title="CSV模板示例"
-        open={csvTemplateModalVisible}
-        onCancel={() => setCsvTemplateModalVisible(false)}
-        footer={[
-          <Button 
-            key="download" 
-            type="primary" 
-            onClick={() => {
-              // 添加BOM标记，确保Excel正确识别UTF-8编码
-              const BOM = "\uFEFF";
-              const csvContentWithBOM = BOM + csvTemplateData;
-              const blob = new Blob([csvContentWithBOM], { type: 'text/csv;charset=utf-8;' });
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.setAttribute('download', '设备导入模板.csv');
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }}
-          >
-            下载模板
-          </Button>,
-          <Button key="close" onClick={() => setCsvTemplateModalVisible(false)}>
-            关闭
-          </Button>
-        ]}
-        width={800}
-      >
-        <div className="csv-template-container">
-          <div className="csv-template-header">
-            <Text strong>CSV文件必须包含以下列（列名必须完全匹配）：</Text>
-          </div>
-          <Table
-            dataSource={[
-              { key: '设备名称', required: '是', description: '设备的唯一名称' },
-              { key: '资产标签', required: '是', description: '资产的唯一标识' },
-              { key: '设备类型', required: '是', description: '可选值：Server、Network、K8S Node、K8S Cluster' },
-              { key: '厂商', required: '否', description: '设备制造商' },
-              { key: '型号', required: '否', description: '设备型号' },
-              { key: 'IP地址', required: '是', description: '设备IP地址' },
-              { key: 'SN码', required: '否', description: '设备序列号' },
-              { key: '系统类型', required: '是', description: '可选值：cisco_ios、huawei_vrp、ruijie_os_telnet等' },
-              { key: '位置', required: '否', description: '设备所在位置' },
-              { key: '所有者', required: '否', description: '设备负责人' },
-              { key: '所属部门', required: '否', description: '设备所属部门' },
-              { key: '上线时间', required: '否', description: '设备上线日期，格式：YYYY-MM-DD' },
-              { key: '购买成本', required: '否', description: '设备购买价格' },
-              { key: '当前价值', required: '否', description: '设备当前估值' }
-            ]}
-            columns={[
-              { title: '列名', dataIndex: 'key', key: 'key' },
-              { title: '是否必填', dataIndex: 'required', key: 'required' },
-              { title: '说明', dataIndex: 'description', key: 'description' }
-            ]}
-            pagination={false}
-            size="small"
-          />
-          <div className="csv-template-example" style={{ marginTop: 16 }}>
-            <Text strong>示例数据：</Text>
-            <pre style={{ 
-              backgroundColor: '#f5f5f5', 
-              padding: 16, 
-              borderRadius: 4,
-              overflowX: 'auto'
-            }}>
-              {csvTemplateData}
-            </pre>
-          </div>
-        </div>
-      </Modal>
+      {renderCsvTemplateModal()}
 
       {/* 添加设备模态框 */}
       <Modal
@@ -931,16 +1091,27 @@ K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发
         open={addDeviceModalVisible}
         onCancel={() => {
           setAddDeviceModalVisible(false);
-          addDeviceForm.resetFields();
+          form.resetFields();
         }}
         footer={null}
         width={800}
-        bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+        styles={{
+          body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }
+        }}
       >
         <Form
-          form={addDeviceForm}
+          form={form}
           layout="vertical"
           onFinish={handleAddDevice}
+          initialValues={{
+            api_type: 'netmiko',
+            device_type: 'cisco_ios',
+            timeout: 30,
+            retry_count: 3,
+            retry_delay: 5,
+            port: 22,
+            auth_type: 'password'
+          }}
         >
           <Row gutter={16}>
             <Col span={8}>
@@ -1140,7 +1311,7 @@ K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发
                 <Button 
                   onClick={() => {
                     setAddDeviceModalVisible(false);
-                    addDeviceForm.resetFields();
+                    form.resetFields();
                   }}
                 >
                   取消
@@ -1168,7 +1339,9 @@ K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发
         }}
         footer={null}
         width={800}
-        bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+        styles={{
+          body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }
+        }}
       >
         <Form
           form={editDeviceForm}
@@ -1389,6 +1562,9 @@ K8SCluster001,K8S-C001,K8S Cluster,,,192.168.3.0/24,,linux,机房C,赵六,研发
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* CSV导入模态框 */}
+      {renderImportModal()}
     </div>
   );
 };

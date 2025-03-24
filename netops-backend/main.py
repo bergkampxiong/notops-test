@@ -15,9 +15,10 @@ from database.models import Base, UsedTOTP, RefreshToken
 from database.session import engine, get_db
 import database.cmdb_models  # 先导入CMDB模型
 import database.category_models  # 再导入设备分类模型
+import database.config_management_models  # 导入配置管理模型
 
 # 导入路由
-from routes import auth, users, audit, ldap, security
+from routes import auth, users, audit, ldap, security, config_management
 from routes.cmdb import router as cmdb_router
 from routes.device import router as device_router
 
@@ -33,8 +34,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 创建数据库表
-Base.metadata.create_all(bind=engine)
+def init_db():
+    """初始化数据库，确保所有表都被创建"""
+    try:
+        # 只创建新表，不删除现有表
+        Base.metadata.create_all(bind=engine)
+        print("Database tables created successfully")
+    except Exception as e:
+        print(f"Error creating database tables: {e}")
+        raise e
+
+# 初始化数据库
+init_db()
 
 # 包含路由
 app.include_router(auth.router)
@@ -44,6 +55,7 @@ app.include_router(ldap.router)
 app.include_router(security.router, prefix="/api/security")
 app.include_router(cmdb_router, prefix="/api")
 app.include_router(device_router, prefix="/api/device")
+app.include_router(config_management.router, prefix="/api/config", tags=["config"])
 
 # 定期清理任务
 def cleanup_expired_records():

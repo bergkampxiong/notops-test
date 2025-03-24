@@ -222,15 +222,12 @@ def get_asset_statistics(
 
 @router.post("/assets/import", response_model=ImportResponse, tags=["CMDB资产"])
 async def import_assets_from_csv(
-    file: UploadFile = File(...),
+    request: dict,
     db: Session = Depends(get_cmdb_db),
 ):
-    """从CSV文件导入资产数据"""
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="只支持CSV文件格式")
-    
-    # 读取CSV文件内容
-    contents = await file.read()
+    """从CSV内容导入资产数据"""
+    if 'content' not in request:
+        raise HTTPException(status_code=400, detail="缺少CSV内容")
     
     # 处理CSV数据
     imported_count = 0
@@ -238,9 +235,8 @@ async def import_assets_from_csv(
     errors = []
     
     try:
-        # 解码CSV内容
-        csv_text = contents.decode('utf-8-sig')
-        csv_reader = csv.DictReader(io.StringIO(csv_text))
+        # 解析CSV内容
+        csv_reader = csv.DictReader(io.StringIO(request['content']))
         
         # 获取设备类型、厂商、状态和系统类型的映射
         device_types = {dt.name: dt.id for dt in db.query(DeviceTypeModel).all()}
@@ -248,36 +244,20 @@ async def import_assets_from_csv(
         statuses = {s.name: s.id for s in db.query(AssetStatusModel).all()}
         locations = {l.name: l.id for l in db.query(LocationModel).all()}
         system_types = {st.name: st.id for st in db.query(SystemTypeModel).all()}
+        departments = {d.name: d.id for d in db.query(DepartmentModel).all()}
         
-        # 处理每一行数据
-        for row_idx, row in enumerate(csv_reader, start=2):  # 从2开始计数，因为第1行是标题
+        for row_idx, row in enumerate(csv_reader, start=1):
             try:
                 # 检查必填字段
-                if not row.get('设备名称'):
-                    errors.append(f"第{row_idx}行: 缺少设备名称")
-                    failed_count += 1
-                    continue
-                
-                if not row.get('设备类型'):
-                    errors.append(f"第{row_idx}行: 缺少设备类型")
-                    failed_count += 1
-                    continue
-                
-                if not row.get('IP地址'):
-                    errors.append(f"第{row_idx}行: 缺少IP地址")
-                    failed_count += 1
-                    continue
-                
-                if not row.get('系统类型'):
-                    errors.append(f"第{row_idx}行: 缺少系统类型")
-                    failed_count += 1
-                    continue
+                required_fields = ['设备名称', '资产标签', '设备类型', 'IP地址', '系统类型']
+                missing_fields = [field for field in required_fields if not row.get(field)]
+                if missing_fields:
+                    raise ValueError(f"缺少必填字段: {', '.join(missing_fields)}")
                 
                 # 获取或创建设备类型
-                device_type_name = row.get('设备类型')
+                device_type_name = row['设备类型']
                 device_type_id = device_types.get(device_type_name)
                 if not device_type_id:
-                    # 创建新的设备类型
                     new_device_type = DeviceTypeModel(
                         name=device_type_name,
                         description=f"从CSV导入创建的设备类型: {device_type_name}",
@@ -295,7 +275,6 @@ async def import_assets_from_csv(
                 if vendor_name:
                     vendor_id = vendors.get(vendor_name)
                     if not vendor_id:
-                        # 创建新的厂商
                         new_vendor = VendorModel(
                             name=vendor_name,
                             description=f"从CSV导入创建的厂商: {vendor_name}",
@@ -307,11 +286,10 @@ async def import_assets_from_csv(
                         vendor_id = new_vendor.id
                         vendors[vendor_name] = vendor_id
                 
-                # 获取或创建状态（默认为"在线"）
-                status_name = "在线"  # 默认状态
+                # 获取或创建状态
+                status_name = row.get('状态', '在线')  # 默认为"在线"
                 status_id = statuses.get(status_name)
                 if not status_id:
-                    # 创建新的状态
                     new_status = AssetStatusModel(
                         name=status_name,
                         description=f"从CSV导入创建的状态: {status_name}",
@@ -324,10 +302,9 @@ async def import_assets_from_csv(
                     statuses[status_name] = status_id
                 
                 # 获取或创建系统类型
-                system_type_name = row.get('系统类型')
+                system_type_name = row['系统类型']
                 system_type_id = system_types.get(system_type_name)
                 if not system_type_id:
-                    # 创建新的系统类型
                     new_system_type = SystemTypeModel(
                         name=system_type_name,
                         description=f"从CSV导入创建的系统类型: {system_type_name}",
@@ -345,7 +322,6 @@ async def import_assets_from_csv(
                 if location_name:
                     location_id = locations.get(location_name)
                     if not location_id:
-                        # 创建新的位置
                         new_location = LocationModel(
                             name=location_name,
                             description=f"从CSV导入创建的位置: {location_name}",
@@ -357,39 +333,94 @@ async def import_assets_from_csv(
                         location_id = new_location.id
                         locations[location_name] = location_id
                 
-                # 创建资产记录
-                asset_tag = row.get('设备名称')  # 如果没有专门的资产标签字段，使用设备名称作为标签
+                # 获取或创建部门
+                department_name = row.get('所属部门')
+                department_id = None
+                if department_name:
+                    department_id = departments.get(department_name)
+                    if not department_id:
+                        new_department = DepartmentModel(
+                            name=department_name,
+                            description=f"从CSV导入创建的部门: {department_name}",
+                            created_at=datetime.now().isoformat(),
+                            updated_at=datetime.now().isoformat()
+                        )
+                        db.add(new_department)
+                        db.flush()
+                        department_id = new_department.id
+                        departments[department_name] = department_id
                 
                 # 检查是否已存在相同的资产标签
+                asset_tag = row['资产标签']
                 existing_asset = db.query(AssetModel).filter(AssetModel.asset_tag == asset_tag).first()
+                
+                # 处理日期字段
+                purchase_date = None
+                if row.get('购买日期'):
+                    try:
+                        purchase_date = datetime.strptime(row['购买日期'], '%Y-%m-%d').date().isoformat()
+                    except ValueError:
+                        errors.append(f"第{row_idx}行: 购买日期格式错误，应为YYYY-MM-DD")
+                
+                online_date = None
+                if row.get('上线时间'):
+                    try:
+                        online_date = datetime.strptime(row['上线时间'], '%Y-%m-%d').date().isoformat()
+                    except ValueError:
+                        errors.append(f"第{row_idx}行: 上线时间格式错误，应为YYYY-MM-DD")
+                
+                warranty_expiry = None
+                if row.get('保修到期'):
+                    try:
+                        warranty_expiry = datetime.strptime(row['保修到期'], '%Y-%m-%d').date().isoformat()
+                    except ValueError:
+                        errors.append(f"第{row_idx}行: 保修到期格式错误，应为YYYY-MM-DD")
+                
+                # 处理金额字段
+                try:
+                    purchase_cost = float(row['购买成本']) if row.get('购买成本') else None
+                except ValueError:
+                    purchase_cost = None
+                    errors.append(f"第{row_idx}行: 购买成本格式错误，应为数字")
+                
+                try:
+                    current_value = float(row['当前价值']) if row.get('当前价值') else None
+                except ValueError:
+                    current_value = None
+                    errors.append(f"第{row_idx}行: 当前价值格式错误，应为数字")
+                
+                asset_data = {
+                    'name': row['设备名称'],
+                    'asset_tag': asset_tag,
+                    'ip_address': row['IP地址'],
+                    'serial_number': row.get('SN码'),
+                    'device_type_id': device_type_id,
+                    'vendor_id': vendor_id,
+                    'department_id': department_id,
+                    'location_id': location_id,
+                    'status_id': status_id,
+                    'system_type_id': system_type_id,
+                    'owner': row.get('所有者'),
+                    'purchase_date': purchase_date,
+                    'purchase_cost': purchase_cost,
+                    'current_value': current_value,
+                    'online_date': online_date,
+                    'warranty_expiry': warranty_expiry,
+                    'notes': row.get('备注'),
+                    'updated_at': datetime.now().isoformat()
+                }
+                
                 if existing_asset:
                     # 更新现有资产
-                    existing_asset.name = row.get('设备名称')
-                    existing_asset.ip_address = row.get('IP地址')
-                    existing_asset.device_type_id = device_type_id
-                    existing_asset.vendor_id = vendor_id
-                    existing_asset.location_id = location_id
-                    existing_asset.status_id = status_id
-                    existing_asset.system_type_id = system_type_id
-                    existing_asset.updated_at = datetime.now().isoformat()
-                    db.flush()
+                    for key, value in asset_data.items():
+                        setattr(existing_asset, key, value)
                 else:
                     # 创建新资产
-                    new_asset = AssetModel(
-                        name=row.get('设备名称'),
-                        asset_tag=asset_tag,
-                        ip_address=row.get('IP地址'),
-                        device_type_id=device_type_id,
-                        vendor_id=vendor_id,
-                        location_id=location_id,
-                        status_id=status_id,
-                        system_type_id=system_type_id,
-                        created_at=datetime.now().isoformat(),
-                        updated_at=datetime.now().isoformat()
-                    )
+                    asset_data['created_at'] = datetime.now().isoformat()
+                    new_asset = AssetModel(**asset_data)
                     db.add(new_asset)
-                    db.flush()
                 
+                db.flush()
                 imported_count += 1
                 
             except IntegrityError as e:
@@ -408,6 +439,7 @@ async def import_assets_from_csv(
         raise HTTPException(status_code=500, detail=f"导入过程中发生错误: {str(e)}")
     
     return {
+        "success": True,
         "imported": imported_count,
         "failed": failed_count,
         "errors": errors if errors else None

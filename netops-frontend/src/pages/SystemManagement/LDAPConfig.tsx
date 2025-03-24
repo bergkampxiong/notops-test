@@ -40,9 +40,16 @@ const LDAPConfig: React.FC = () => {
         form.setFieldsValue(response.data);
         setConfigId(response.data.id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取LDAP配置失败:', error);
-      message.error('获取LDAP配置失败');
+      if (error.response?.status === 404) {
+        // 如果是404错误，说明还没有配置，清空表单
+        form.resetFields();
+        setConfigId(null);
+        message.info('尚未配置LDAP，请填写以下信息进行配置');
+      } else {
+        message.error('获取LDAP配置失败');
+      }
     } finally {
       setLoading(false);
     }

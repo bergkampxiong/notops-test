@@ -1038,17 +1038,24 @@ const DeviceCategory: React.FC = () => {
           selectedKeys={[activeTab]}
           style={{ height: '100%' }}
           onClick={({ key }) => handleTabChange(key as string)}
-        >
-          <Menu.Item key="category" icon={<AppstoreOutlined />}>
-            分类管理
-          </Menu.Item>
-          <Menu.Item key="member" icon={<TeamOutlined />}>
-            成员管理
-          </Menu.Item>
-          <Menu.Item key="display" icon={<UserOutlined />}>
-            成员显示
-          </Menu.Item>
-        </Menu>
+          items={[
+            {
+              key: 'category',
+              icon: <AppstoreOutlined />,
+              label: '分类管理'
+            },
+            {
+              key: 'member',
+              icon: <TeamOutlined />,
+              label: '成员管理'
+            },
+            {
+              key: 'display',
+              icon: <UserOutlined />,
+              label: '成员显示'
+            }
+          ]}
+        />
       </Sider>
       <Content style={{ padding: '0 24px', minHeight: 280 }}>
         {activeTab === 'category' && <CategoryManagement />}
