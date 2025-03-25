@@ -1,0 +1,194 @@
+.pd-flow-designer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.pd-toolbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pd-toolbar-group {
+  display: flex;
+  gap: 8px;
+}
+
+.pd-toolbar-button {
+  padding: 6px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background-color: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pd-toolbar-button:hover {
+  background-color: #f0f0f0;
+}
+
+.pd-toolbar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pd-flow-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.pd-sidebar {
+  width: 300px;
+  background-color: #fff;
+  border-left: 1px solid #e0e0e0;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.pd-node-config-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pd-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pd-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pd-form-group label {
+  font-size: 14px;
+  color: #666;
+}
+
+.pd-form-group input,
+.pd-form-group textarea {
+  padding: 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.pd-form-group textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* 节点样式 */
+.pd-node {
+  padding: 12px;
+  border-radius: 4px;
+  background-color: #fff;
+  border: 1px solid #d0d0d0;
+  min-width: 150px;
+}
+
+.pd-node-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pd-node-type {
+  font-size: 12px;
+  color: #666;
+}
+
+.pd-node-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.pd-node-description {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* 节点类型特定样式 */
+.pd-start-node {
+  background-color: #e3f2fd;
+  border-color: #90caf9;
+}
+
+.pd-end-node {
+  background-color: #fce4ec;
+  border-color: #f8bbd0;
+}
+
+.pd-condition-node {
+  background-color: #fff3e0;
+  border-color: #ffcc80;
+}
+
+.pd-loop-node {
+  background-color: #e8f5e9;
+  border-color: #a5d6a7;
+}
+
+/* 连接点样式 */
+.pd-handle {
+  width: 8px;
+  height: 8px;
+  background-color: #90caf9;
+  border: 2px solid #fff;
+}
+
+.pd-handle-top {
+  top: -4px;
+}
+
+.pd-handle-bottom {
+  bottom: -4px;
+}
+
+.pd-handle-left {
+  left: -4px;
+}
+
+.pd-handle-right {
+  right: -4px;
+}
+
+/* ReactFlow 自定义样式 */
+.react-flow__node {
+  padding: 0;
+  border-radius: 4px;
+  border: none;
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background-color: #90caf9;
+  border: 2px solid #fff;
+}
+
+.react-flow__edge-path {
+  stroke: #90caf9;
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+} 
