@@ -251,7 +251,7 @@ export const PDFlowDesigner: React.FC = () => {
         canRedo={historyIndex < history.length - 1}
       />
       
-      <div className="pd-flow-container">
+      <div className="pd-flow-container" style={{ flex: 1, position: 'relative' }}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -261,6 +261,7 @@ export const PDFlowDesigner: React.FC = () => {
           onNodeClick={handleNodeClick}
           nodeTypes={nodeTypes}
           fitView
+          style={{ width: '100%', height: '100%' }}
         >
           <Background />
           <Controls />
