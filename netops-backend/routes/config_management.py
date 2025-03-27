@@ -10,7 +10,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/config",
+    tags=["config"],
+    responses={404: {"description": "Not found"}},
+)
 
 @router.get("/files", response_model=List[ConfigFile])
 def get_configs(
@@ -45,7 +49,9 @@ def create_config(
 ):
     try:
         service = ConfigManagementService(db)
-        return service.create_config(config)
+        # 这里使用系统用户ID，实际项目中应该从认证中间件获取
+        user_id = "system"
+        return service.create_config(config, user_id)
     except Exception as e:
         logger.error(f"Error creating config: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

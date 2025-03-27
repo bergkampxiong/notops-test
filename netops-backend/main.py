@@ -25,13 +25,13 @@ from routes.device import router as device_router
 # 创建应用
 app = FastAPI(title="NetOps API", version="1.0.0")
 
-# 添加CORS中间件
+# 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # 允许所有来源，生产环境应该设置具体的域名
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # 允许所有方法
+    allow_headers=["*"],  # 允许所有请求头
 )
 
 def init_db():
@@ -55,7 +55,7 @@ app.include_router(ldap.router)
 app.include_router(security.router, prefix="/api/security")
 app.include_router(cmdb_router, prefix="/api")
 app.include_router(device_router, prefix="/api/device")
-app.include_router(config_management.router, prefix="/api/config", tags=["config"])
+app.include_router(config_management.router, prefix="/api", tags=["config"])
 
 # 定期清理任务
 def cleanup_expired_records():

@@ -3,19 +3,32 @@ import { Card, Typography, Form, Input, Button, Space, message, Table, Modal, Se
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import styles from './index.module.less';
+import request from '../../../../utils/request';
 
 const { Title } = Typography;
 const { TextArea } = Input;
 const { Option } = Select;
 
 interface ConfigFile {
-  id: number;
+  id: string;
   name: string;
   type: string;
   content: string;
   description: string;
+  status: string;
+  device_type: string;
+  tags: string[];
   created_at: string;
   updated_at: string;
+  created_by: string;
+  updated_by: string;
+  versions?: Array<{
+    version: number;
+    content: string;
+    comment: string;
+    created_at: string;
+    created_by: string;
+  }>;
 }
 
 const ConfigManagement: React.FC = () => {
@@ -26,6 +39,24 @@ const ConfigManagement: React.FC = () => {
   const [editingConfig, setEditingConfig] = useState<ConfigFile | null>(null);
   const [searchText, setSearchText] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
+
+  // 加载配置列表
+  const fetchConfigs = async () => {
+    setLoading(true);
+    try {
+      const response = await request.get('/api/config/files');
+      setConfigs(response.data);
+    } catch (error: any) {
+      message.error('加载配置列表失败: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 组件加载时获取数据
+  React.useEffect(() => {
+    fetchConfigs();
+  }, []);
 
   // 表格列定义
   const columns: ColumnsType<ConfigFile> = [
@@ -45,12 +76,11 @@ const ConfigManagement: React.FC = () => {
       key: 'type',
       render: (type) => (
         <Tag color={
-          type === 'yaml' ? 'blue' :
-          type === 'json' ? 'green' :
-          type === 'ini' ? 'orange' :
+          type === 'jinja2' ? 'blue' :
+          type === 'textfsm' ? 'green' :
           'purple'
         }>
-          {type.toUpperCase()}
+          {type === 'jinja2' ? 'Jinja2 模板' : 'TextFSM 模板'}
         </Tag>
       ),
     },
@@ -93,16 +123,22 @@ const ConfigManagement: React.FC = () => {
   const handleAdd = () => {
     setEditingConfig(null);
     form.resetFields();
+    form.setFieldsValue({ type: 'jinja2' });
     setModalVisible(true);
   };
 
   const handleEdit = (record: ConfigFile) => {
     setEditingConfig(record);
-    form.setFieldsValue(record);
+    form.setFieldsValue({
+      name: record.name,
+      type: record.type,
+      content: record.content,
+      description: record.description,
+    });
     setModalVisible(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个配置吗？此操作不可恢复。',
@@ -110,11 +146,11 @@ const ConfigManagement: React.FC = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          // TODO: 实现删除API
+          await request.delete(`/api/config/files/${id}`);
           message.success('删除成功');
           setConfigs(configs.filter(config => config.id !== id));
-        } catch (error) {
-          message.error('删除失败');
+        } catch (error: any) {
+          message.error('删除失败: ' + (error.response?.data?.detail || error.message));
         }
       },
     });
@@ -122,28 +158,38 @@ const ConfigManagement: React.FC = () => {
 
   const handleSubmit = async (values: any) => {
     try {
+      const configData = {
+        name: values.name,
+        type: values.type,
+        content: values.content,
+        description: values.description || '',
+      };
+
       if (editingConfig) {
-        // TODO: 实现更新API
+        // 更新配置
+        await request.put(`/api/config/files/${editingConfig.id}`, configData);
         message.success('更新成功');
         setConfigs(configs.map(config => 
-          config.id === editingConfig.id ? { ...values, id: editingConfig.id } : config
+          config.id === editingConfig.id ? { ...config, ...configData } : config
         ));
       } else {
-        // TODO: 实现创建API
-        const newConfig = {
-          ...values,
-          id: Date.now(),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-        setConfigs([...configs, newConfig]);
+        // 创建新配置
+        const response = await request.post('/api/config/files', configData);
+        setConfigs([...configs, response.data]);
         message.success('创建成功');
       }
       setModalVisible(false);
       form.resetFields();
-    } catch (error) {
-      message.error('操作失败');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || error.message || '操作失败';
+      message.error(`操作失败: ${errorMessage}`);
     }
+  };
+
+  const handleModalCancel = () => {
+    setModalVisible(false);
+    form.resetFields();
+    setEditingConfig(null);
   };
 
   const filteredConfigs = configs.filter(config => {
@@ -180,10 +226,8 @@ const ConfigManagement: React.FC = () => {
               style={{ width: 120 }}
             >
               <Option value="all">全部类型</Option>
-              <Option value="yaml">YAML</Option>
-              <Option value="json">JSON</Option>
-              <Option value="ini">INI</Option>
-              <Option value="env">ENV</Option>
+              <Option value="jinja2">Jinja2 模板</Option>
+              <Option value="textfsm">TextFSM 模板</Option>
             </Select>
             <Button icon={<ReloadOutlined />} onClick={() => {
               setSearchText('');
@@ -212,18 +256,18 @@ const ConfigManagement: React.FC = () => {
         title={editingConfig ? '编辑配置' : '新增配置'}
         open={modalVisible}
         onOk={() => form.submit()}
-        onCancel={() => {
-          setModalVisible(false);
-          form.resetFields();
-        }}
+        onCancel={handleModalCancel}
         width={800}
         destroyOnClose
+        maskClosable={false}
+        keyboard={false}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={{ type: 'yaml' }}
+          initialValues={{ type: 'jinja2' }}
+          preserve={false}
         >
           <Form.Item
             name="name"
@@ -238,10 +282,8 @@ const ConfigManagement: React.FC = () => {
             rules={[{ required: true, message: '请选择配置类型' }]}
           >
             <Select placeholder="请选择配置类型">
-              <Option value="yaml">YAML</Option>
-              <Option value="json">JSON</Option>
-              <Option value="ini">INI</Option>
-              <Option value="env">ENV</Option>
+              <Option value="jinja2">Jinja2 模板</Option>
+              <Option value="textfsm">TextFSM 模板</Option>
             </Select>
           </Form.Item>
           <Form.Item
