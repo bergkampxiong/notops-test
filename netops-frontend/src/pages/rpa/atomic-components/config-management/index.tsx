@@ -14,10 +14,6 @@ interface ConfigFile {
   name: string;
   type: string;
   content: string;
-  description: string;
-  status: string;
-  device_type: string;
-  tags: string[];
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -85,17 +81,6 @@ const ConfigManagement: React.FC = () => {
       ),
     },
     {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-      render: (text) => (
-        <Tooltip title={text}>
-          <span>{text}</span>
-        </Tooltip>
-      ),
-    },
-    {
       title: '更新时间',
       dataIndex: 'updated_at',
       key: 'updated_at',
@@ -133,7 +118,6 @@ const ConfigManagement: React.FC = () => {
       name: record.name,
       type: record.type,
       content: record.content,
-      description: record.description,
     });
     setModalVisible(true);
   };
@@ -162,7 +146,6 @@ const ConfigManagement: React.FC = () => {
         name: values.name,
         type: values.type,
         content: values.content,
-        description: values.description || '',
       };
 
       if (editingConfig) {
@@ -193,8 +176,7 @@ const ConfigManagement: React.FC = () => {
   };
 
   const filteredConfigs = configs.filter(config => {
-    const matchesSearch = config.name.toLowerCase().includes(searchText.toLowerCase()) ||
-                         config.description.toLowerCase().includes(searchText.toLowerCase());
+    const matchesSearch = config.name.toLowerCase().includes(searchText.toLowerCase());
     const matchesType = selectedType === 'all' || config.type === selectedType;
     return matchesSearch && matchesType;
   });
@@ -214,7 +196,7 @@ const ConfigManagement: React.FC = () => {
         <div className={styles.searchBar}>
           <Space>
             <Input
-              placeholder="搜索配置名称或描述"
+              placeholder="搜索配置名称"
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
@@ -297,17 +279,6 @@ const ConfigManagement: React.FC = () => {
               showCount
               maxLength={5000}
               style={{ fontFamily: 'monospace' }}
-            />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="描述"
-          >
-            <Input.TextArea
-              placeholder="请输入配置描述"
-              maxLength={200}
-              showCount
-              rows={3}
             />
           </Form.Item>
         </Form>

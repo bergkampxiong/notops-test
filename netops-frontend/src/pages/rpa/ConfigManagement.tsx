@@ -255,18 +255,6 @@ const ConfigManagement: React.FC = () => {
       ),
     },
     {
-      title: '标签',
-      dataIndex: 'tags',
-      key: 'tags',
-      render: (tags: string[]) => (
-        <>
-          {tags.map(tag => (
-            <Tag key={tag}>{tag}</Tag>
-          ))}
-        </>
-      ),
-    },
-    {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
@@ -501,18 +489,6 @@ const ConfigManagement: React.FC = () => {
               templateType={form.getFieldValue('template_type') || 'jinja2'}
               height="400px"
             />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="描述"
-          >
-            <Input.TextArea />
-          </Form.Item>
-          <Form.Item
-            name="tags"
-            label="标签"
-          >
-            <Select mode="tags" />
           </Form.Item>
           <Form.Item
             name="status"
