@@ -291,13 +291,6 @@ const ConfigManagement: React.FC = () => {
           </Button>
           <Button
             type="text"
-            icon={<HistoryOutlined />}
-            onClick={() => handleViewVersions(record.id)}
-          >
-            版本
-          </Button>
-          <Button
-            type="text"
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record.id)}
