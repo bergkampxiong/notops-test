@@ -146,6 +146,8 @@ const ConfigManagement: React.FC = () => {
         name: values.name,
         type: values.type,
         content: values.content,
+        device_type: values.device_type || 'cisco_ios',  // 设置默认设备类型
+        status: values.status || 'draft',  // 设置默认状态
       };
 
       if (editingConfig) {
@@ -235,51 +237,77 @@ const ConfigManagement: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingConfig ? '编辑配置' : '新增配置'}
+        title={editingConfig ? "编辑配置" : "新建配置"}
         open={modalVisible}
-        onOk={() => form.submit()}
+        onOk={handleSubmit}
         onCancel={handleModalCancel}
         width={800}
-        destroyOnClose
-        maskClosable={false}
-        keyboard={false}
       >
         <Form
           form={form}
           layout="vertical"
-          onFinish={handleSubmit}
-          initialValues={{ type: 'jinja2' }}
-          preserve={false}
+          initialValues={editingConfig || {
+            type: 'yaml',
+            device_type: 'cisco_ios',
+            status: 'draft'
+          }}
         >
           <Form.Item
             name="name"
             label="配置名称"
             rules={[{ required: true, message: '请输入配置名称' }]}
           >
-            <Input placeholder="请输入配置名称" maxLength={50} showCount />
+            <Input placeholder="请输入配置名称" />
           </Form.Item>
+
           <Form.Item
             name="type"
             label="配置类型"
             rules={[{ required: true, message: '请选择配置类型' }]}
           >
-            <Select placeholder="请选择配置类型">
-              <Option value="jinja2">Jinja2 模板</Option>
-              <Option value="textfsm">TextFSM 模板</Option>
+            <Select>
+              <Option value="yaml">YAML</Option>
+              <Option value="json">JSON</Option>
+              <Option value="ini">INI</Option>
+              <Option value="env">ENV</Option>
             </Select>
           </Form.Item>
+
+          <Form.Item
+            name="device_type"
+            label="设备类型"
+            rules={[{ required: true, message: '请选择设备类型' }]}
+          >
+            <Select>
+              <Option value="cisco_ios">Cisco IOS</Option>
+              <Option value="huawei_vrp">Huawei VRP</Option>
+              <Option value="hpe_comware7">HPE Comware7</Option>
+              <Option value="ruijie_os">Ruijie OS</Option>
+              <Option value="cisco_nxos">Cisco NXOS</Option>
+              <Option value="cisco_xe">Cisco XE</Option>
+              <Option value="cisco_xr">Cisco XR</Option>
+              <Option value="linux">Linux</Option>
+              <Option value="paloalto_panos">PaloAlto PANOS</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="status"
+            label="状态"
+            rules={[{ required: true, message: '请选择状态' }]}
+          >
+            <Select>
+              <Option value="draft">草稿</Option>
+              <Option value="published">已发布</Option>
+            </Select>
+          </Form.Item>
+
           <Form.Item
             name="content"
             label="配置内容"
             rules={[{ required: true, message: '请输入配置内容' }]}
           >
-            <TextArea
-              rows={10}
-              placeholder="请输入配置内容"
-              showCount
-              maxLength={5000}
-              style={{ fontFamily: 'monospace' }}
-            />
+            <TextArea rows={10} placeholder="请输入配置内容" />
           </Form.Item>
         </Form>
       </Modal>
