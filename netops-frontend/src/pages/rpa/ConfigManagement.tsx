@@ -291,13 +291,6 @@ const ConfigManagement: React.FC = () => {
           </Button>
           <Button
             type="text"
-            icon={<ExportOutlined />}
-            onClick={() => handleExport(record)}
-          >
-            导出
-          </Button>
-          <Button
-            type="text"
             icon={<HistoryOutlined />}
             onClick={() => handleViewVersions(record.id)}
           >
