@@ -42,6 +42,8 @@ class ConfigManagementService:
                 type=config_dict['template_type'],
                 content=config_dict['content'],
                 description=config_dict.get('description'),
+                device_type=config_dict.get('device_type', 'cisco_ios'),
+                status=config_dict.get('status', 'draft'),
                 created_at=now,
                 updated_at=now
             )
@@ -56,8 +58,8 @@ class ConfigManagementService:
                 template_type=db_config.type,
                 content=db_config.content,
                 description=db_config.description,
-                status=config_dict.get('status', 'draft'),
-                device_type=config_dict.get('device_type', 'default'),
+                status=db_config.status,
+                device_type=db_config.device_type,
                 tags=config_dict.get('tags', []),
                 created_at=db_config.created_at,
                 updated_at=db_config.updated_at,
@@ -76,7 +78,7 @@ class ConfigManagementService:
                 config_dict = config.dict()
                 
                 # 只更新数据库模型中存在的字段
-                allowed_fields = ['name', 'type', 'content', 'description']
+                allowed_fields = ['name', 'type', 'content', 'description', 'device_type', 'status']
                 for key, value in config_dict.items():
                     if key in allowed_fields:
                         if key == 'template_type':
@@ -94,8 +96,8 @@ class ConfigManagementService:
                     template_type=db_config.type,
                     content=db_config.content,
                     description=db_config.description,
-                    status=config_dict.get('status', 'draft'),
-                    device_type=config_dict.get('device_type', 'default'),
+                    status=db_config.status,  # 使用数据库中的实际状态
+                    device_type=db_config.device_type,  # 使用数据库中的实际设备类型
                     tags=config_dict.get('tags', []),
                     created_at=db_config.created_at,
                     updated_at=db_config.updated_at,
@@ -128,8 +130,8 @@ class ConfigManagementService:
                 template_type=db_config.type,
                 content=db_config.content,
                 description=db_config.description,
-                status="draft",
-                device_type="default",
+                status=db_config.status,
+                device_type=db_config.device_type,
                 tags=[],
                 created_at=db_config.created_at,
                 updated_at=db_config.updated_at,

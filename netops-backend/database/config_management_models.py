@@ -11,6 +11,8 @@ class ConfigFile(Base):
     type = Column(String(20), nullable=False)  # yaml, json, ini, env
     content = Column(Text, nullable=False)
     description = Column(String(500), nullable=True)
+    device_type = Column(String(50), nullable=False, default='cisco_ios')
+    status = Column(String(20), nullable=False, default='draft')
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -24,6 +26,8 @@ class ConfigFile(Base):
             'type': self.type,
             'content': self.content,
             'description': self.description,
+            'device_type': self.device_type,
+            'status': self.status,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         } 
