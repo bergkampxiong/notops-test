@@ -71,7 +71,10 @@ class ConfigManagementService:
         db_config = self.db.query(ConfigFileModel).filter(ConfigFileModel.id == config_id).first()
         if db_config is None:
             return None
-        return ConfigFile.from_orm(db_config)
+        config = ConfigFile.from_orm(db_config)
+        # 获取版本信息
+        config.versions = self.get_versions(config_id)
+        return config
     
     def update_config(self, config_id: str, config: ConfigFileUpdate, user_id: str) -> Optional[ConfigFile]:
         db_config = self.db.query(ConfigFileModel).filter(ConfigFileModel.id == config_id).first()
@@ -98,13 +101,15 @@ class ConfigManagementService:
         self.db.commit()
         return True
     
-    def create_version(self, config_id: str, content: str, user_id: str) -> ConfigVersion:
+    def create_version(self, config_id: str, content: str, comment: str, user_id: str) -> ConfigVersion:
         """创建新的配置版本"""
         version = ConfigVersionModel(
             id=str(uuid.uuid4()),
             config_id=config_id,
             content=content,
+            comment=comment,
             created_by=user_id,
+            created_at=datetime.now().isoformat(),
             version=self._get_next_version(config_id)
         )
         self.db.add(version)
@@ -147,7 +152,7 @@ class ConfigManagementService:
             return False
             
         # 创建新版本作为回滚记录
-        new_version = self.create_version(config_id, version.content, user_id)
+        new_version = self.create_version(config_id, version.content, version.comment, user_id)
         
         # 更新当前配置内容
         config.content = version.content

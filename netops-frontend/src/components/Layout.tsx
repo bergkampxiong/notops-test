@@ -187,6 +187,10 @@ const Layout: React.FC = () => {
               label: '配置管理组件',
             },
             {
+              key: 'rpa/atomic-components/config-generator',
+              label: '配置生成组件',
+            },
+            {
               key: 'rpa/atomic-components/data-collection',
               label: '数据采集组件',
             },

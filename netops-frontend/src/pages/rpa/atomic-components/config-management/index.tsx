@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Card, Typography, Form, Input, Button, Space, message, Table, Modal, Select, Tag, Tooltip, InputNumber } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Card, Typography, Form, Input, Button, Space, message, Table, Modal, Select, Tag, Tooltip } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutlined, CopyOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import styles from './index.module.less';
 import request from '../../../../utils/request';
@@ -18,6 +18,8 @@ interface ConfigFile {
   updated_at: string;
   created_by: string;
   updated_by: string;
+  device_type: string;
+  status: string;
   versions?: Array<{
     version: number;
     content: string;
@@ -50,7 +52,7 @@ const ConfigManagement: React.FC = () => {
   };
 
   // 组件加载时获取数据
-  React.useEffect(() => {
+  useEffect(() => {
     fetchConfigs();
   }, []);
 
@@ -81,6 +83,16 @@ const ConfigManagement: React.FC = () => {
       ),
     },
     {
+      title: '设备类型',
+      dataIndex: 'device_type',
+      key: 'device_type',
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+    },
+    {
       title: '更新时间',
       dataIndex: 'updated_at',
       key: 'updated_at',
@@ -95,6 +107,9 @@ const ConfigManagement: React.FC = () => {
         <Space>
           <Tooltip title="编辑">
             <Button type="link" icon={<EditOutlined />} onClick={() => handleEdit(record)} />
+          </Tooltip>
+          <Tooltip title="复制">
+            <Button type="link" icon={<CopyOutlined />} onClick={() => handleCopy(record)} />
           </Tooltip>
           <Tooltip title="删除">
             <Button type="link" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)} />
@@ -140,14 +155,28 @@ const ConfigManagement: React.FC = () => {
     });
   };
 
+  const handleCopy = async (record: ConfigFile) => {
+    try {
+      const response = await request.post('/api/config/files', {
+        ...record,
+        name: `${record.name}_copy`,
+        id: undefined,
+      });
+      message.success('复制成功');
+      setConfigs([...configs, response.data]);
+    } catch (error: any) {
+      message.error('复制失败: ' + (error.response?.data?.detail || error.message));
+    }
+  };
+
   const handleSubmit = async (values: any) => {
     try {
-      const configData = {
+      const configData: Partial<ConfigFile> = {
         name: values.name,
-        type: values.type,
+        type: values.type || 'config',
         content: values.content,
-        device_type: values.device_type || 'cisco_ios',  // 设置默认设备类型
-        status: values.status || 'draft',  // 设置默认状态
+        device_type: values.device_type || 'cisco_ios',
+        status: values.status || 'draft'
       };
 
       if (editingConfig) {
@@ -188,11 +217,6 @@ const ConfigManagement: React.FC = () => {
       <Card className={styles.mainCard}>
         <div className={styles.header}>
           <Title level={4}>配置管理</Title>
-          <Space>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              新增配置
-            </Button>
-          </Space>
         </div>
 
         <div className={styles.searchBar}>
@@ -219,6 +243,9 @@ const ConfigManagement: React.FC = () => {
             }}>
               重置
             </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+              新增配置
+            </Button>
           </Space>
         </div>
 
@@ -239,15 +266,16 @@ const ConfigManagement: React.FC = () => {
       <Modal
         title={editingConfig ? "编辑配置" : "新建配置"}
         open={modalVisible}
-        onOk={handleSubmit}
+        onOk={form.submit}
         onCancel={handleModalCancel}
         width={800}
       >
         <Form
           form={form}
           layout="vertical"
+          onFinish={handleSubmit}
           initialValues={editingConfig || {
-            type: 'yaml',
+            type: 'jinja2',
             device_type: 'cisco_ios',
             status: 'draft'
           }}
@@ -266,6 +294,8 @@ const ConfigManagement: React.FC = () => {
             rules={[{ required: true, message: '请选择配置类型' }]}
           >
             <Select>
+              <Option value="jinja2">Jinja2 模板</Option>
+              <Option value="textfsm">TextFSM 模板</Option>
               <Option value="yaml">YAML</Option>
               <Option value="json">JSON</Option>
               <Option value="ini">INI</Option>

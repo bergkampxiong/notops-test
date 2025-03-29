@@ -5,6 +5,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import AtomicComponents from './AtomicComponents';
 import DeviceConnections from './DeviceConnections';
 import ConfigManagement from './ConfigManagement';
+import ConfigGenerator from './atomic-components/config-generator';
 import DataCollection from './DataCollection';
 import SecurityAudit from './SecurityAudit';
 import AlertReporting from './AlertReporting';
@@ -39,6 +40,7 @@ const RPARouter: React.FC = () => {
         <Route index element={<Navigate to="device-connections" />} />
         <Route path="device-connections" element={<DeviceConnections />} />
         <Route path="config-management" element={<ConfigManagement />} />
+        <Route path="config-generator" element={<ConfigGenerator />} />
         <Route path="data-collection" element={<DataCollection />} />
         <Route path="security-audit" element={<SecurityAudit />} />
         <Route path="alert-reporting" element={<AlertReporting />} />
