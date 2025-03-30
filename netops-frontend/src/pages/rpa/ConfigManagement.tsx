@@ -444,6 +444,7 @@ const ConfigManagement: React.FC = () => {
             <Select>
               <Option value="jinja2">Jinja2 模板</Option>
               <Option value="textfsm">TextFSM 模板</Option>
+              <Option value="job">作业配置</Option>
             </Select>
           </Form.Item>
           <Form.Item

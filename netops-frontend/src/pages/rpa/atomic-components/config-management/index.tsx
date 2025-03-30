@@ -37,6 +37,13 @@ const ConfigManagement: React.FC = () => {
   const [editingConfig, setEditingConfig] = useState<ConfigFile | null>(null);
   const [searchText, setSearchText] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [currentType, setCurrentType] = useState<string>('jinja2');
+
+  // 监听表单类型变化
+  const handleTypeChange = (value: string) => {
+    setCurrentType(value);
+    form.setFieldsValue({ content: '' }); // 清空内容，避免格式不匹配
+  };
 
   // 加载配置列表
   const fetchConfigs = async () => {
@@ -76,9 +83,13 @@ const ConfigManagement: React.FC = () => {
         <Tag color={
           type === 'jinja2' ? 'blue' :
           type === 'textfsm' ? 'green' :
+          type === 'job' ? 'orange' :
           'purple'
         }>
-          {type === 'jinja2' ? 'Jinja2 模板' : 'TextFSM 模板'}
+          {type === 'jinja2' ? 'Jinja2 模板' : 
+           type === 'textfsm' ? 'TextFSM 模板' : 
+           type === 'job' ? '作业配置' : 
+           '其他'}
         </Tag>
       ),
     },
@@ -123,16 +134,24 @@ const ConfigManagement: React.FC = () => {
   const handleAdd = () => {
     setEditingConfig(null);
     form.resetFields();
-    form.setFieldsValue({ type: 'jinja2' });
+    setCurrentType('jinja2');
+    form.setFieldsValue({ 
+      type: 'jinja2',
+      device_type: 'cisco_ios',
+      status: 'draft'
+    });
     setModalVisible(true);
   };
 
   const handleEdit = (record: ConfigFile) => {
     setEditingConfig(record);
+    setCurrentType(record.type);
     form.setFieldsValue({
       name: record.name,
       type: record.type,
+      device_type: record.device_type,
       content: record.content,
+      status: record.status
     });
     setModalVisible(true);
   };
@@ -171,11 +190,31 @@ const ConfigManagement: React.FC = () => {
 
   const handleSubmit = async (values: any) => {
     try {
+      // 如果是作业配置，验证JSON格式
+      if (values.type === 'job') {
+        try {
+          const jobConfig = JSON.parse(values.content);
+          if (!jobConfig.name || !Array.isArray(jobConfig.steps)) {
+            message.error('作业配置格式错误：必须包含 name 和 steps 字段');
+            return;
+          }
+          for (const step of jobConfig.steps) {
+            if (!step.type) {
+              message.error('作业配置格式错误：每个步骤必须包含 type 字段');
+              return;
+            }
+          }
+        } catch (e) {
+          message.error('作业配置必须是有效的JSON格式');
+          return;
+        }
+      }
+
       const configData: Partial<ConfigFile> = {
         name: values.name,
-        type: values.type || 'config',
+        type: values.type,
         content: values.content,
-        device_type: values.device_type || 'cisco_ios',
+        device_type: values.device_type,
         status: values.status || 'draft'
       };
 
@@ -232,11 +271,13 @@ const ConfigManagement: React.FC = () => {
               value={selectedType}
               onChange={setSelectedType}
               style={{ width: 120 }}
-            >
-              <Option value="all">全部类型</Option>
-              <Option value="jinja2">Jinja2 模板</Option>
-              <Option value="textfsm">TextFSM 模板</Option>
-            </Select>
+              options={[
+                { value: 'all', label: '全部类型' },
+                { value: 'jinja2', label: 'Jinja2 模板' },
+                { value: 'textfsm', label: 'TextFSM 模板' },
+                { value: 'job', label: '作业配置' }
+              ]}
+            />
             <Button icon={<ReloadOutlined />} onClick={() => {
               setSearchText('');
               setSelectedType('all');
@@ -264,7 +305,7 @@ const ConfigManagement: React.FC = () => {
       </Card>
 
       <Modal
-        title={editingConfig ? "编辑配置" : "新建配置"}
+        title={editingConfig ? "编辑配置" : "新增配置"}
         open={modalVisible}
         onOk={form.submit}
         onCancel={handleModalCancel}
@@ -274,7 +315,7 @@ const ConfigManagement: React.FC = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          initialValues={editingConfig || {
+          initialValues={{
             type: 'jinja2',
             device_type: 'cisco_ios',
             status: 'draft'
@@ -290,17 +331,17 @@ const ConfigManagement: React.FC = () => {
 
           <Form.Item
             name="type"
-            label="配置类型"
-            rules={[{ required: true, message: '请选择配置类型' }]}
+            label="模板类型"
+            rules={[{ required: true, message: '请选择模板类型' }]}
           >
-            <Select>
-              <Option value="jinja2">Jinja2 模板</Option>
-              <Option value="textfsm">TextFSM 模板</Option>
-              <Option value="yaml">YAML</Option>
-              <Option value="json">JSON</Option>
-              <Option value="ini">INI</Option>
-              <Option value="env">ENV</Option>
-            </Select>
+            <Select 
+              onChange={handleTypeChange}
+              options={[
+                { value: 'jinja2', label: 'Jinja2 模板' },
+                { value: 'textfsm', label: 'TextFSM 模板' },
+                { value: 'job', label: '作业配置' }
+              ]}
+            />
           </Form.Item>
 
           <Form.Item
@@ -311,7 +352,7 @@ const ConfigManagement: React.FC = () => {
             <Select>
               <Option value="cisco_ios">Cisco IOS</Option>
               <Option value="huawei_vrp">Huawei VRP</Option>
-              <Option value="hpe_comware7">HPE Comware7</Option>
+              <Option value="h3c_comware">H3C Comware</Option>
               <Option value="ruijie_os">Ruijie OS</Option>
               <Option value="cisco_nxos">Cisco NXOS</Option>
               <Option value="cisco_xe">Cisco XE</Option>
@@ -319,6 +360,21 @@ const ConfigManagement: React.FC = () => {
               <Option value="linux">Linux</Option>
               <Option value="paloalto_panos">PaloAlto PANOS</Option>
             </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="content"
+            label="配置内容"
+            rules={[{ required: true, message: '请输入配置内容' }]}
+            extra={currentType === 'job' ? '请输入JSON格式的作业配置，例如：\n{\n  "name": "示例作业",\n  "steps": [\n    {\n      "type": "command",\n      "command": "show version"\n    }\n  ]\n}' : undefined}
+          >
+            <TextArea 
+              rows={15} 
+              placeholder={currentType === 'job' ? 
+                '请输入JSON格式的作业配置' : 
+                '请输入配置内容'
+              } 
+            />
           </Form.Item>
 
           <Form.Item
@@ -330,14 +386,6 @@ const ConfigManagement: React.FC = () => {
               <Option value="draft">草稿</Option>
               <Option value="published">已发布</Option>
             </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="content"
-            label="配置内容"
-            rules={[{ required: true, message: '请输入配置内容' }]}
-          >
-            <TextArea rows={10} placeholder="请输入配置内容" />
           </Form.Item>
         </Form>
       </Modal>
