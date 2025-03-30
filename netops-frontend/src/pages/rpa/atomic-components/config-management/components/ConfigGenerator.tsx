@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Select, Space, message } from 'antd';
 import { ConfigFile } from '../types';
+import MonacoEditor from '@monaco-editor/react';
 
 interface ConfigGeneratorProps {
   templates: ConfigFile[];
@@ -10,6 +11,7 @@ interface ConfigGeneratorProps {
 const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) => {
   const [form] = Form.useForm();
   const [selectedTemplate, setSelectedTemplate] = useState<ConfigFile | null>(null);
+  const [templateContent, setTemplateContent] = useState<string>('');
   const [previewContent, setPreviewContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
@@ -18,6 +20,7 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
     const template = templates.find(t => t.id === templateId);
     if (template) {
       setSelectedTemplate(template);
+      setTemplateContent(template.content);
       form.resetFields();
       setPreviewContent('');
     }
@@ -29,15 +32,15 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
 
     try {
       setLoading(true);
-      // 这里需要调用后端API生成配置
-      const response = await fetch(`/api/config/generate`, {
+      // 调用后端API生成配置
+      const response = await fetch('/api/config/render-template', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          template_id: selectedTemplate.id,
-          parameters: allValues,
+          template_name: selectedTemplate.name,
+          variables: allValues,
         }),
       });
 
@@ -70,7 +73,7 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
         content: previewContent,
         device_type: selectedTemplate.device_type,
         description: `由模板 ${selectedTemplate.name} 生成的配置`,
-        parameters: values  // 保存生成配置时使用的参数
+        parameters: values
       });
       
       message.success('配置已保存');
@@ -81,54 +84,49 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
     }
   };
 
-  // 根据模板类型生成参数表单
-  const renderParameterForm = () => {
-    if (!selectedTemplate) return null;
-
-    switch (selectedTemplate.type) {
-      case 'jinja2':
-        return (
-          <>
-            <Form.Item
-              label="主机名"
-              name="hostname"
-              rules={[{ required: true, message: '请输入主机名' }]}
-            >
-              <Input />
-            </Form.Item>
-
-            <Form.Item
-              label="IP地址"
-              name="ip_address"
-              rules={[{ required: true, message: '请输入IP地址' }]}
-            >
-              <Input />
-            </Form.Item>
-
-            <Form.Item
-              label="接口"
-              name="interface"
-              rules={[{ required: true, message: '请输入接口名称' }]}
-            >
-              <Input />
-            </Form.Item>
-          </>
-        );
-      case 'textfsm':
-        return (
-          <>
-            <Form.Item
-              label="命令输出"
-              name="command_output"
-              rules={[{ required: true, message: '请输入命令输出' }]}
-            >
-              <Input.TextArea rows={4} />
-            </Form.Item>
-          </>
-        );
-      default:
-        return null;
+  // 从模板内容中提取参数
+  const extractParameters = (content: string) => {
+    const paramRegex = /\{\{\s*(\w+)\s*\}\}/g;
+    const forLoopRegex = /\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}/g;
+    const ifRegex = /\{%\s*if\s+(\w+)\s*%\}/g;
+    
+    const params = new Set<string>();
+    
+    // 提取简单变量
+    let match;
+    while ((match = paramRegex.exec(content)) !== null) {
+      params.add(match[1]);
     }
+    
+    // 提取循环变量
+    while ((match = forLoopRegex.exec(content)) !== null) {
+      params.add(match[2]);
+    }
+    
+    // 提取条件变量
+    while ((match = ifRegex.exec(content)) !== null) {
+      params.add(match[1]);
+    }
+    
+    return Array.from(params);
+  };
+
+  // 根据模板内容生成参数表单
+  const renderParameterForm = () => {
+    if (!selectedTemplate || !templateContent) return null;
+
+    const parameters = extractParameters(templateContent);
+    
+    return parameters.map(param => (
+      <Form.Item
+        key={param}
+        label={param}
+        name={param}
+        rules={[{ required: true, message: `请输入${param}` }]}
+      >
+        <Input />
+      </Form.Item>
+    ));
   };
 
   return (
@@ -156,35 +154,58 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
           )}
         </Card>
 
-        {/* 中间参数配置 */}
-        <Card title="参数配置" style={{ flex: 1, height: '100%', overflow: 'auto' }}>
-          <Form
-            form={form}
-            layout="vertical"
-            onValuesChange={handleValuesChange}
-          >
-            {selectedTemplate && renderParameterForm()}
-          </Form>
+        {/* 中间模板内容和参数配置 */}
+        <Card title="模板内容和参数配置" style={{ flex: 1, height: '100%', overflow: 'auto' }}>
           {selectedTemplate && (
-            <div style={{ marginTop: 16 }}>
-              <Button
-                type="primary"
-                onClick={handleSave}
-                loading={loading}
-                disabled={!previewContent}
+            <>
+              <div style={{ marginBottom: 16 }}>
+                <MonacoEditor
+                  height="300px"
+                  language="jinja"
+                  theme="vs-light"
+                  value={templateContent}
+                  options={{
+                    readOnly: true,
+                    minimap: { enabled: false },
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on'
+                  }}
+                />
+              </div>
+              <Form
+                form={form}
+                layout="vertical"
+                onValuesChange={handleValuesChange}
               >
-                保存配置
-              </Button>
-            </div>
+                {renderParameterForm()}
+                <Button
+                  type="primary"
+                  onClick={handleSave}
+                  loading={loading}
+                  disabled={!previewContent}
+                >
+                  保存配置
+                </Button>
+              </Form>
+            </>
           )}
         </Card>
 
         {/* 右侧预览 */}
         <Card title="配置预览" style={{ flex: 1, height: '100%', overflow: 'auto' }}>
-          <Input.TextArea
+          <MonacoEditor
+            height="calc(100% - 40px)"
+            language="plaintext"
+            theme="vs-light"
             value={previewContent}
-            style={{ height: 'calc(100% - 40px)', fontFamily: 'monospace' }}
-            readOnly
+            options={{
+              readOnly: true,
+              minimap: { enabled: false },
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              wordWrap: 'on'
+            }}
           />
         </Card>
       </div>
