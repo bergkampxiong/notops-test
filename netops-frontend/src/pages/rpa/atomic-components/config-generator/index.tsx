@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Typography, message, Form, Input, Select, Space, Button, Spin } from 'antd';
+import { Card, Typography, message, Form, Select, Button, Spin } from 'antd';
 import request from '../../../../utils/request';
 import MonacoEditor from '@monaco-editor/react';
+import nunjucks from 'nunjucks';
 import styles from './index.module.less';
 
 const { Title } = Typography;
@@ -21,11 +22,17 @@ interface ConfigFile {
 }
 
 const ConfigGeneratorPage: React.FC = () => {
-  const [form] = Form.useForm();
   const [configs, setConfigs] = useState<ConfigFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ConfigFile | null>(null);
   const [previewContent, setPreviewContent] = useState<string>('');
+  const [paramsJson, setParamsJson] = useState<string>('{\n  "configuration": {}\n}');
+  const [jsonError, setJsonError] = useState<string>('');
+
+  // 初始化nunjucks环境
+  useEffect(() => {
+    nunjucks.configure({ autoescape: false });
+  }, []);
 
   // 加载模板列表
   const fetchTemplates = async () => {
@@ -48,55 +55,36 @@ const ConfigGeneratorPage: React.FC = () => {
     fetchTemplates();
   }, []);
 
-  // 从模板内容中提取参数
-  const extractParameters = (content: string) => {
-    const paramRegex = /\{\{\s*(\w+)\s*\}\}/g;
-    const forLoopRegex = /\{%\s*for\s+(\w+)\s+in\s+(\w+)\s*%\}/g;
-    const ifRegex = /\{%\s*if\s+(\w+)\s*%\}/g;
-    
-    const params = new Set<string>();
-    
-    let match;
-    while ((match = paramRegex.exec(content)) !== null) {
-      params.add(match[1]);
-    }
-    
-    while ((match = forLoopRegex.exec(content)) !== null) {
-      params.add(match[2]);
-    }
-    
-    while ((match = ifRegex.exec(content)) !== null) {
-      params.add(match[1]);
-    }
-    
-    return Array.from(params);
-  };
-
   // 处理模板选择
   const handleTemplateSelect = (templateId: string) => {
-    const template = configs.find(c => c.id === templateId);
-    if (template) {
-      setSelectedTemplate(template);
-      form.resetFields();
+    const selectedConfig = configs.find(c => c.id === templateId);
+    if (selectedConfig) {
+      setSelectedTemplate(selectedConfig);
+      setParamsJson('{\n  "configuration": {}\n}');
       setPreviewContent('');
+      setJsonError('');
     }
   };
 
-  // 处理参数变化，生成预览
-  const handleValuesChange = async (changedValues: any, allValues: any) => {
-    if (!selectedTemplate) return;
-
+  // 处理JSON变化，生成预览
+  const handleJsonChange = async (value: string | undefined) => {
+    if (!value || !selectedTemplate) return;
+    
+    setParamsJson(value);
     try {
-      setLoading(true);
-      const response = await request.post('/api/config/render-template', {
-        template_name: selectedTemplate.name,
-        variables: allValues
-      });
-      setPreviewContent(response.data.content);
-    } catch (error: any) {
-      message.error('生成预览失败: ' + (error.response?.data?.detail || error.message));
-    } finally {
-      setLoading(false);
+      const variables = JSON.parse(value);
+      setJsonError('');
+      
+      try {
+        // 使用nunjucks在前端渲染模板
+        const renderedContent = nunjucks.renderString(selectedTemplate.content, variables);
+        setPreviewContent(renderedContent);
+      } catch (error: any) {
+        message.error('生成预览失败: ' + error.message);
+        setPreviewContent('');
+      }
+    } catch (e) {
+      setJsonError('JSON格式错误');
     }
   };
 
@@ -107,8 +95,12 @@ const ConfigGeneratorPage: React.FC = () => {
       return;
     }
 
+    if (jsonError) {
+      message.error('请先修正JSON格式错误');
+      return;
+    }
+
     try {
-      const values = await form.validateFields();
       const configData = {
         name: `${selectedTemplate.name}_${new Date().getTime()}`,
         content: previewContent,
@@ -120,7 +112,7 @@ const ConfigGeneratorPage: React.FC = () => {
 
       await request.post('/api/config/files', configData);
       message.success('配置已保存');
-      form.resetFields();
+      setParamsJson('{\n  "configuration": {}\n}');
       setPreviewContent('');
     } catch (error: any) {
       message.error('保存失败: ' + (error.response?.data?.detail || error.message));
@@ -202,39 +194,52 @@ const ConfigGeneratorPage: React.FC = () => {
                     />
                   </div>
                   <Card
-                    title="参数配置"
+                    title="参数配置 (JSON格式)"
                     type="inner"
                     bordered={false}
                     style={{ background: '#fafafa', borderRadius: '8px' }}
+                    extra={
+                      <Button
+                        type="primary"
+                        onClick={handleSave}
+                        disabled={!previewContent || !!jsonError}
+                        icon={<span className="anticon">💾</span>}
+                      >
+                        保存配置
+                      </Button>
+                    }
                   >
-                    <Form
-                      form={form}
-                      layout="vertical"
-                      onValuesChange={handleValuesChange}
-                    >
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px' }}>
-                        {extractParameters(selectedTemplate.content).map(param => (
-                          <Form.Item
-                            key={param}
-                            label={param}
-                            name={param}
-                            rules={[{ required: true, message: `请输入${param}` }]}
-                          >
-                            <Input placeholder={`请输入${param}`} />
-                          </Form.Item>
-                        ))}
-                      </div>
-                      <Form.Item style={{ marginBottom: 0, marginTop: 16 }}>
-                        <Button
-                          type="primary"
-                          onClick={handleSave}
-                          disabled={!previewContent}
-                          icon={<span className="anticon">💾</span>}
-                        >
-                          保存配置
-                        </Button>
-                      </Form.Item>
-                    </Form>
+                    <div style={{ position: 'relative' }}>
+                      <MonacoEditor
+                        height="200px"
+                        language="json"
+                        theme="vs-light"
+                        value={paramsJson}
+                        onChange={handleJsonChange}
+                        options={{
+                          minimap: { enabled: false },
+                          lineNumbers: 'on',
+                          scrollBeyondLastLine: false,
+                          wordWrap: 'on',
+                          fontSize: 14,
+                          fontFamily: "'Fira Code', Consolas, 'Courier New', monospace"
+                        }}
+                      />
+                      {jsonError && (
+                        <div style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          padding: '8px',
+                          background: '#fff1f0',
+                          color: '#cf1322',
+                          borderTop: '1px solid #ffa39e'
+                        }}>
+                          {jsonError}
+                        </div>
+                      )}
+                    </div>
                   </Card>
                 </>
               ) : (
