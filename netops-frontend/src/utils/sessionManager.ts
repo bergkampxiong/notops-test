@@ -1,4 +1,5 @@
 import api from '../services/auth';
+import { message } from 'antd';
 
 interface SessionManagerOptions {
   defaultTimeout?: number; // 默认超时时间（分钟）
@@ -12,19 +13,53 @@ class SessionManager {
   private warningTimeSeconds: number;
   private timer: NodeJS.Timeout | null = null;
   private warningTimer: NodeJS.Timeout | null = null;
+  private initialized: boolean = false;
+  private events: string[] = [
+    'mousedown',
+    'keydown',
+    'scroll',
+    'touchstart'
+  ];
   private onTimeout: () => void;
   private onWarning: () => void;
-  private events: string[] = [
-    'mousedown', 'mousemove', 'keypress', 
-    'scroll', 'touchstart', 'click', 'keydown'
-  ];
-  private initialized: boolean = false;
 
   constructor(options: SessionManagerOptions = {}) {
     this.timeoutMinutes = options.defaultTimeout || 30;
     this.warningTimeSeconds = options.warningTime || 60;
-    this.onTimeout = options.onTimeout || (() => console.log('Session timeout'));
-    this.onWarning = options.onWarning || (() => console.log('Session warning'));
+    this.onTimeout = options.onTimeout || this.defaultTimeoutHandler;
+    this.onWarning = options.onWarning || this.defaultWarningHandler;
+  }
+
+  /**
+   * 默认超时处理函数
+   */
+  private defaultTimeoutHandler = async (): Promise<void> => {
+    try {
+      await api.post('/auth/logout');
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('登出失败:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      window.location.href = '/login';
+    }
+  }
+
+  /**
+   * 默认警告处理函数
+   */
+  private defaultWarningHandler = (): void => {
+    message.warning({
+      content: '会话即将超时',
+      description: `由于长时间未操作，您的会话将在 ${this.warningTimeSeconds} 秒后超时。请选择继续操作或退出系统。`,
+      duration: this.warningTimeSeconds,
+      onClose: () => {
+        // 用户关闭警告消息，重置计时器
+        this.resetTimer();
+      }
+    });
   }
 
   /**
@@ -108,24 +143,7 @@ class SessionManager {
    * 处理用户活动
    */
   public handleUserActivity = (): void => {
-    this.resetTimer();
-  }
-
-  /**
-   * 处理页面可见性变化
-   */
-  private handleVisibilityChange = (): void => {
-    if (document.visibilityState === 'visible') {
-      // 页面变为可见时，重置计时器
-      this.resetTimer();
-    }
-  }
-
-  /**
-   * 重置计时器
-   */
-  private resetTimer(): void {
-    // 清除现有计时器
+    // 清除所有现有计时器
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -135,8 +153,8 @@ class SessionManager {
       clearTimeout(this.warningTimer);
       this.warningTimer = null;
     }
-    
-    // 计算超时和警告时间（毫秒）
+
+    // 重新设置计时器
     const timeoutMs = this.timeoutMinutes * 60 * 1000;
     const warningMs = timeoutMs - (this.warningTimeSeconds * 1000);
     
@@ -149,6 +167,25 @@ class SessionManager {
     this.timer = setTimeout(() => {
       this.timeout();
     }, timeoutMs);
+
+    console.log('用户活动，重置会话计时器');
+  }
+
+  /**
+   * 处理页面可见性变化
+   */
+  private handleVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      // 页面变为可见时，重置计时器
+      this.handleUserActivity();
+    }
+  }
+
+  /**
+   * 重置计时器
+   */
+  private resetTimer(): void {
+    this.handleUserActivity();
   }
 
   /**

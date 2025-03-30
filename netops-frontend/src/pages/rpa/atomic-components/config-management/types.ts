@@ -1,7 +1,7 @@
 export interface ConfigFile {
   id: string;
   name: string;
-  type: string;
+  template_type: string;
   content: string;
   created_at: string;
   updated_at: string;
