@@ -3,16 +3,58 @@ from sqlalchemy.orm import Session
 from database.config_management_models import ConfigFile as DBConfigFile
 from schemas.config_management import ConfigFileCreate, ConfigFileUpdate, ConfigFile
 from datetime import datetime
+from sqlalchemy import and_
 
 class ConfigManagementService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_configs(self) -> List[ConfigFile]:
+    def get_configs(
+        self,
+        skip: int = 0,
+        limit: int = 10,
+        name: Optional[str] = None,
+        device_type: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        status: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> List[ConfigFile]:
         try:
-            db_configs = self.db.query(DBConfigFile).all()
-            return [self._convert_to_response_model(config) for config in db_configs]
+            # 构建基础查询
+            query = self.db.query(DBConfigFile)
+            
+            # 构建过滤条件列表
+            filters = []
+            
+            # 应用过滤条件
+            if name:
+                filters.append(DBConfigFile.name.ilike(f"%{name}%"))
+            if device_type:
+                print(f"Filtering by device_type: {device_type}")  # 添加日志
+                filters.append(DBConfigFile.device_type == device_type)
+            if status:
+                filters.append(DBConfigFile.status == status)
+            if start_date:
+                filters.append(DBConfigFile.created_at >= start_date)
+            if end_date:
+                filters.append(DBConfigFile.created_at <= end_date)
+            
+            # 应用所有过滤条件
+            if filters:
+                print(f"Applying filters: {filters}")  # 添加日志
+                query = query.filter(and_(*filters))
+            
+            # 执行查询
+            print(f"Executing query: {query}")  # 添加日志
+            configs = query.offset(skip).limit(limit).all()
+            
+            # 转换为响应模型
+            result = [self._convert_to_response_model(config) for config in configs]
+            print(f"Found {len(result)} configs")  # 添加日志
+            return result
         except Exception as e:
+            print(f"Error in get_configs: {str(e)}")  # 添加日志
             raise Exception(f"获取配置列表失败: {str(e)}")
 
     def get_config(self, config_id: int) -> Optional[ConfigFile]:
@@ -139,4 +181,45 @@ class ConfigManagementService:
                 updated_by="system"
             )
         except Exception as e:
-            raise Exception(f"转换响应模型失败: {str(e)}") 
+            raise Exception(f"转换响应模型失败: {str(e)}")
+
+    def search_configs(
+        self,
+        name: Optional[str] = None,
+        device_type: Optional[str] = None,
+        status: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        skip: int = 0,
+        limit: int = 10
+    ) -> List[ConfigFile]:
+        try:
+            query = self.db.query(DBConfigFile)
+            
+            # 构建过滤条件
+            filters = []
+            
+            if name:
+                filters.append(DBConfigFile.name.ilike(f"%{name}%"))
+            if device_type:
+                filters.append(DBConfigFile.device_type == device_type)
+            if status:
+                filters.append(DBConfigFile.status == status)
+            if start_date:
+                filters.append(DBConfigFile.created_at >= start_date)
+            if end_date:
+                filters.append(DBConfigFile.created_at <= end_date)
+            
+            # 应用所有过滤条件
+            if filters:
+                query = query.filter(and_(*filters))
+            
+            # 应用分页
+            query = query.offset(skip).limit(limit)
+            
+            # 执行查询
+            db_configs = query.all()
+            return [self._convert_to_response_model(config) for config in db_configs]
+            
+        except Exception as e:
+            raise Exception(f"搜索配置失败: {str(e)}") 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from database.database import get_db
 from services.config_management_service import ConfigManagementService
 from schemas.config_management import ConfigFileCreate, ConfigFileUpdate, ConfigFile
@@ -9,9 +9,25 @@ from datetime import datetime
 router = APIRouter()
 
 @router.get("/config/files", response_model=List[ConfigFile])
-def get_configs(db: Session = Depends(get_db)):
-    service = ConfigManagementService(db)
-    return service.get_configs()
+def get_configs(
+    device_type: Optional[str] = None,
+    name: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    try:
+        service = ConfigManagementService(db)
+        return service.get_configs(
+            device_type=device_type,
+            name=name,
+            status=status,
+            skip=skip,
+            limit=limit
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取配置列表失败: {str(e)}")
 
 @router.get("/config/files/{config_id}", response_model=ConfigFile)
 def get_config(config_id: int, db: Session = Depends(get_db)):

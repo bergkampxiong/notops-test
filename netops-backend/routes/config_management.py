@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from database.session import get_db
 from services.config_management_service import ConfigManagementService
 from schemas.config_management import ConfigFile, ConfigFileCreate, ConfigFileUpdate
+from datetime import datetime
 import logging
 
 # 配置日志
@@ -18,11 +19,25 @@ router = APIRouter(
 
 @router.get("/files", response_model=List[ConfigFile])
 def get_configs(
+    device_type: Optional[str] = None,
+    name: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10,
     db: Session = Depends(get_db)
 ):
     try:
+        print(f"Received request with device_type: {device_type}")  # 添加日志
         service = ConfigManagementService(db)
-        return service.get_configs()
+        result = service.get_configs(
+            device_type=device_type,
+            name=name,
+            status=status,
+            skip=skip,
+            limit=limit
+        )
+        print(f"Returning {len(result)} configs")  # 添加日志
+        return result
     except Exception as e:
         logger.error(f"Error getting configs: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -84,4 +99,30 @@ def delete_config(
         return {"message": "Config deleted successfully"}
     except Exception as e:
         logger.error(f"Error deleting config {config_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/files/search", response_model=List[ConfigFile])
+def search_configs(
+    name: Optional[str] = None,
+    device_type: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    try:
+        service = ConfigManagementService(db)
+        return service.search_configs(
+            name=name,
+            device_type=device_type,
+            status=status,
+            start_date=start_date,
+            end_date=end_date,
+            skip=skip,
+            limit=limit
+        )
+    except Exception as e:
+        logger.error(f"Error searching configs: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 
