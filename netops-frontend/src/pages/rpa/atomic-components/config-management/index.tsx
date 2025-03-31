@@ -12,7 +12,7 @@ const { Option } = Select;
 interface ConfigFile {
   id: string;
   name: string;
-  type: string;
+  template_type: string;
   content: string;
   created_at: string;
   updated_at: string;
@@ -49,9 +49,34 @@ const ConfigManagement: React.FC = () => {
   const fetchConfigs = async () => {
     setLoading(true);
     try {
+      console.log('开始请求配置列表...');
       const response = await request.get('/api/config/files');
+      console.log('收到API响应:', response);
+      
+      if (!response || !response.data) {
+        console.error('API响应数据为空');
+        return;
+      }
+      
+      // 检查数据中的 template_type
+      if (Array.isArray(response.data)) {
+        console.log('配置列表数据:', response.data);
+        response.data.forEach((item: any) => {
+          console.log('配置项详情:', {
+            id: item.id,
+            name: item.name,
+            template_type: item.template_type,
+            device_type: item.device_type,
+            status: item.status
+          });
+        });
+      } else {
+        console.error('API响应数据不是数组:', response.data);
+      }
+      
       setConfigs(response.data);
     } catch (error: any) {
+      console.error('加载配置列表失败:', error);
       message.error('加载配置列表失败: ' + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
@@ -60,8 +85,14 @@ const ConfigManagement: React.FC = () => {
 
   // 组件加载时获取数据
   useEffect(() => {
+    console.log('组件加载，开始获取配置列表');
     fetchConfigs();
   }, []);
+
+  // 监听 configs 变化
+  useEffect(() => {
+    console.log('配置列表状态更新:', configs);
+  }, [configs]);
 
   // 表格列定义
   const columns: ColumnsType<ConfigFile> = [
@@ -77,21 +108,30 @@ const ConfigManagement: React.FC = () => {
     },
     {
       title: '配置类型',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type) => (
-        <Tag color={
-          type === 'jinja2' ? 'blue' :
-          type === 'textfsm' ? 'green' :
-          type === 'job' ? 'orange' :
-          'purple'
-        }>
-          {type === 'jinja2' ? 'Jinja2 模板' : 
-           type === 'textfsm' ? 'TextFSM 模板' : 
-           type === 'job' ? '作业配置' : 
-           '其他'}
-        </Tag>
-      ),
+      dataIndex: 'template_type',
+      key: 'template_type',
+      render: (type: string) => {
+        console.log('渲染配置类型:', {
+          value: type,
+          type: typeof type,
+          raw: JSON.stringify(type)
+        });
+        
+        const typeMap = {
+          'jinja2': { color: 'blue', text: 'Jinja2 模板' },
+          'textfsm': { color: 'green', text: 'TextFSM 模板' },
+          'job': { color: 'orange', text: '作业配置' }
+        } as const;
+        
+        const typeInfo = typeMap[type as keyof typeof typeMap] || { color: 'purple', text: '其他' };
+        console.log('选择的类型信息:', typeInfo);
+        
+        return (
+          <Tag color={typeInfo.color}>
+            {typeInfo.text}
+          </Tag>
+        );
+      },
     },
     {
       title: '设备类型',
@@ -136,7 +176,7 @@ const ConfigManagement: React.FC = () => {
     form.resetFields();
     setCurrentType('jinja2');
     form.setFieldsValue({ 
-      type: 'jinja2',
+      template_type: 'jinja2',
       device_type: 'cisco_ios',
       status: 'draft'
     });
@@ -145,10 +185,10 @@ const ConfigManagement: React.FC = () => {
 
   const handleEdit = (record: ConfigFile) => {
     setEditingConfig(record);
-    setCurrentType(record.type);
+    setCurrentType(record.template_type);
     form.setFieldsValue({
       name: record.name,
-      type: record.type,
+      template_type: record.template_type,
       device_type: record.device_type,
       content: record.content,
       status: record.status
@@ -191,43 +231,74 @@ const ConfigManagement: React.FC = () => {
   const handleSubmit = async (values: any) => {
     try {
       // 如果是作业配置，验证JSON格式
-      if (values.type === 'job') {
+      if (values.template_type === 'job') {
         try {
           const jobConfig = JSON.parse(values.content);
           if (!jobConfig.name || !Array.isArray(jobConfig.steps)) {
-            message.error('作业配置格式错误：必须包含 name 和 steps 字段');
+            message.error('作业配置格式不正确');
             return;
           }
-          for (const step of jobConfig.steps) {
-            if (!step.type) {
-              message.error('作业配置格式错误：每个步骤必须包含 type 字段');
-              return;
-            }
-          }
         } catch (e) {
-          message.error('作业配置必须是有效的JSON格式');
+          message.error('作业配置JSON格式不正确');
           return;
         }
       }
 
-      const configData: Partial<ConfigFile> = {
-        name: values.name,
-        type: values.type,
-        content: values.content,
-        device_type: values.device_type,
-        status: values.status || 'draft'
-      };
+      console.log('提交的表单数据:', values);  // 添加日志
 
       if (editingConfig) {
         // 更新配置
-        await request.put(`/api/config/files/${editingConfig.id}`, configData);
+        console.log('发送更新请求:', {
+          id: editingConfig.id,
+          data: {
+            name: values.name,
+            template_type: values.template_type,
+            content: values.content,
+            device_type: values.device_type,
+            status: values.status || 'draft',
+            description: values.description || null,
+            tags: values.tags || []
+          }
+        });  // 添加日志
+        
+        const response = await request.put(`/api/config/files/${editingConfig.id}`, {
+          name: values.name,
+          template_type: values.template_type,
+          content: values.content,
+          device_type: values.device_type,
+          status: values.status || 'draft',
+          description: values.description || null,
+          tags: values.tags || []
+        });
+        
+        console.log('更新响应:', response.data);  // 添加日志
         message.success('更新成功');
         setConfigs(configs.map(config => 
-          config.id === editingConfig.id ? { ...config, ...configData } : config
+          config.id === editingConfig.id ? response.data : config
         ));
       } else {
         // 创建新配置
-        const response = await request.post('/api/config/files', configData);
+        console.log('发送创建请求:', {
+          name: values.name,
+          template_type: values.template_type,
+          content: values.content,
+          device_type: values.device_type,
+          status: values.status || 'draft',
+          description: values.description || null,
+          tags: values.tags || []
+        });  // 添加日志
+        
+        const response = await request.post('/api/config/files', {
+          name: values.name,
+          template_type: values.template_type,
+          content: values.content,
+          device_type: values.device_type,
+          status: values.status || 'draft',
+          description: values.description || null,
+          tags: values.tags || []
+        });
+        
+        console.log('创建响应:', response.data);  // 添加日志
         setConfigs([...configs, response.data]);
         message.success('创建成功');
       }
@@ -247,7 +318,7 @@ const ConfigManagement: React.FC = () => {
 
   const filteredConfigs = configs.filter(config => {
     const matchesSearch = config.name.toLowerCase().includes(searchText.toLowerCase());
-    const matchesType = selectedType === 'all' || config.type === selectedType;
+    const matchesType = selectedType === 'all' || config.template_type === selectedType;
     return matchesSearch && matchesType;
   });
 
@@ -316,7 +387,7 @@ const ConfigManagement: React.FC = () => {
           layout="vertical"
           onFinish={handleSubmit}
           initialValues={{
-            type: 'jinja2',
+            template_type: 'jinja2',
             device_type: 'cisco_ios',
             status: 'draft'
           }}
@@ -330,7 +401,7 @@ const ConfigManagement: React.FC = () => {
           </Form.Item>
 
           <Form.Item
-            name="type"
+            name="template_type"
             label="模板类型"
             rules={[{ required: true, message: '请选择模板类型' }]}
           >

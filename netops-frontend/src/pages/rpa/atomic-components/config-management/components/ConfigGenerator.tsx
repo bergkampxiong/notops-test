@@ -142,13 +142,17 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
           >
             {templates.map(template => (
               <Select.Option key={template.id} value={template.id}>
-                {template.name} ({template.template_type === 'jinja2' ? 'Jinja2' : template.template_type === 'textfsm' ? 'TextFSM' : template.template_type === 'job' ? '作业配置' : '其他'})
+                {template.name} ({template.template_type === 'jinja2' ? 'Jinja2 模板' : 
+                                  template.template_type === 'textfsm' ? 'TextFSM 模板' : 
+                                  template.template_type === 'job' ? '作业配置' : '其他'})
               </Select.Option>
             ))}
           </Select>
           {selectedTemplate && (
             <div style={{ marginTop: 16 }}>
-              <p><strong>模板类型：</strong> {selectedTemplate.template_type === 'jinja2' ? 'Jinja2' : selectedTemplate.template_type === 'textfsm' ? 'TextFSM' : selectedTemplate.template_type === 'job' ? '作业配置' : '其他'}</p>
+              <p><strong>模板类型：</strong> {selectedTemplate.template_type === 'jinja2' ? 'Jinja2 模板' : 
+                                           selectedTemplate.template_type === 'textfsm' ? 'TextFSM 模板' : 
+                                           selectedTemplate.template_type === 'job' ? '作业配置' : '其他'}</p>
               <p><strong>设备类型：</strong> {selectedTemplate.device_type}</p>
             </div>
           )}

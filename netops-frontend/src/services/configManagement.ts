@@ -3,11 +3,12 @@ import request from '../utils/request';
 export interface ConfigFile {
   id: string;
   name: string;
-  device_type: string;
+  template_type: string;
   content: string;
-  description: string;
-  tags: string[];
+  description: string | null;
   status: string;
+  device_type: string;
+  tags: string[];
   created_at: string;
   updated_at: string;
   created_by: string;

@@ -81,7 +81,7 @@ class ConfigManagementService:
             # 创建数据库模型
             db_config = DBConfigFile(
                 name=config_dict['name'],
-                type=config_dict['template_type'],
+                template_type=config_dict['template_type'],
                 content=config_dict['content'],
                 description=config_dict.get('description'),
                 device_type=config_dict.get('device_type', 'cisco_ios'),
@@ -97,7 +97,7 @@ class ConfigManagementService:
             return ConfigFile(
                 id=str(db_config.id),
                 name=db_config.name,
-                template_type=db_config.type,
+                template_type=db_config.template_type,
                 content=db_config.content,
                 description=db_config.description,
                 status=db_config.status,
@@ -120,11 +120,11 @@ class ConfigManagementService:
                 config_dict = config.dict()
                 
                 # 只更新数据库模型中存在的字段
-                allowed_fields = ['name', 'type', 'content', 'description', 'device_type', 'status']
+                allowed_fields = ['name', 'template_type', 'content', 'description', 'device_type', 'status']
                 for key, value in config_dict.items():
                     if key in allowed_fields:
                         if key == 'template_type':
-                            setattr(db_config, 'type', value)
+                            setattr(db_config, 'template_type', value)
                         else:
                             setattr(db_config, key, value)
                 db_config.updated_at = datetime.utcnow()
@@ -135,11 +135,11 @@ class ConfigManagementService:
                 return ConfigFile(
                     id=str(db_config.id),
                     name=db_config.name,
-                    template_type=db_config.type,
+                    template_type=db_config.template_type,
                     content=db_config.content,
                     description=db_config.description,
-                    status=db_config.status,  # 使用数据库中的实际状态
-                    device_type=db_config.device_type,  # 使用数据库中的实际设备类型
+                    status=db_config.status,
+                    device_type=db_config.device_type,
                     tags=config_dict.get('tags', []),
                     created_at=db_config.created_at,
                     updated_at=db_config.updated_at,
@@ -169,7 +169,7 @@ class ConfigManagementService:
             return ConfigFile(
                 id=str(db_config.id),
                 name=db_config.name,
-                template_type=db_config.type,
+                template_type=db_config.template_type,
                 content=db_config.content,
                 description=db_config.description,
                 status=db_config.status,

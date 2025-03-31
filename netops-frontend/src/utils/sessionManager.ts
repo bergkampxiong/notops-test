@@ -1,3 +1,4 @@
+import React from 'react';
 import api from '../services/auth';
 import { message } from 'antd';
 
@@ -52,8 +53,7 @@ class SessionManager {
    */
   private defaultWarningHandler = (): void => {
     message.warning({
-      content: '会话即将超时',
-      description: `由于长时间未操作，您的会话将在 ${this.warningTimeSeconds} 秒后超时。请选择继续操作或退出系统。`,
+      content: `由于长时间未操作，您的会话将在 ${this.warningTimeSeconds} 秒后超时。请选择继续操作或退出系统。`,
       duration: this.warningTimeSeconds,
       onClose: () => {
         // 用户关闭警告消息，重置计时器

@@ -3,12 +3,14 @@ export interface ConfigFile {
   name: string;
   template_type: string;
   content: string;
+  description: string | null;
+  status: string;
+  device_type: string;
+  tags: string[];
   created_at: string;
   updated_at: string;
   created_by: string;
   updated_by: string;
-  device_type: string;
-  status: string;
   versions?: Array<{
     version: number;
     content: string;
