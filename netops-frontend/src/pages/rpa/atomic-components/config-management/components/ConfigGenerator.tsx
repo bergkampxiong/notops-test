@@ -3,6 +3,8 @@ import { Card, Form, Input, Button, Select, Space, message } from 'antd';
 import { ConfigFile } from '../types';
 import MonacoEditor from '@monaco-editor/react';
 
+const { TextArea } = Input;
+
 interface ConfigGeneratorProps {
   templates: ConfigFile[];
   onSave: (config: any) => void;
@@ -14,6 +16,7 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
   const [templateContent, setTemplateContent] = useState<string>('');
   const [previewContent, setPreviewContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [currentType, setCurrentType] = useState<string>('jinja2');
 
   // 处理模板选择
   const handleTemplateSelect = (templateId: string) => {
@@ -23,6 +26,7 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
       setTemplateContent(template.content);
       form.resetFields();
       setPreviewContent('');
+      setCurrentType(template.template_type);
     }
   };
 
@@ -129,6 +133,23 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
     ));
   };
 
+  const handleTypeChange = (value: string) => {
+    setCurrentType(value);
+  };
+
+  const getTemplateTypeDisplay = (type: string) => {
+    switch (type) {
+      case 'jinja2':
+        return 'Jinja2 模板';
+      case 'textfsm':
+        return 'TextFSM 模板';
+      case 'job':
+        return '作业配置';
+      default:
+        return type;
+    }
+  };
+
   return (
     <div style={{ padding: '20px 0' }}>
       <div style={{ display: 'flex', gap: '20px', height: 'calc(100vh - 300px)' }}>
@@ -142,17 +163,13 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
           >
             {templates.map(template => (
               <Select.Option key={template.id} value={template.id}>
-                {template.name} ({template.template_type === 'jinja2' ? 'Jinja2 模板' : 
-                                  template.template_type === 'textfsm' ? 'TextFSM 模板' : 
-                                  template.template_type === 'job' ? '作业配置' : '其他'})
+                {template.name} ({getTemplateTypeDisplay(template.template_type)})
               </Select.Option>
             ))}
           </Select>
           {selectedTemplate && (
             <div style={{ marginTop: 16 }}>
-              <p><strong>模板类型：</strong> {selectedTemplate.template_type === 'jinja2' ? 'Jinja2 模板' : 
-                                           selectedTemplate.template_type === 'textfsm' ? 'TextFSM 模板' : 
-                                           selectedTemplate.template_type === 'job' ? '作业配置' : '其他'}</p>
+              <p><strong>模板类型：</strong> {getTemplateTypeDisplay(selectedTemplate.template_type)}</p>
               <p><strong>设备类型：</strong> {selectedTemplate.device_type}</p>
             </div>
           )}
@@ -183,6 +200,34 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
                 onValuesChange={handleValuesChange}
               >
                 {renderParameterForm()}
+                <Form.Item
+                  name="template_type"
+                  label="模板类型"
+                  rules={[{ required: true, message: '请选择模板类型' }]}
+                >
+                  <Select 
+                    onChange={handleTypeChange}
+                    options={[
+                      { value: 'jinja2', label: 'Jinja2 模板' },
+                      { value: 'textfsm', label: 'TextFSM 模板' },
+                      { value: 'job', label: '作业配置' }
+                    ]}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="content"
+                  label="配置内容"
+                  rules={[{ required: true, message: '请输入配置内容' }]}
+                  extra={currentType === 'job' ? '请输入JSON格式的作业配置，例如：\n{\n  "name": "示例作业",\n  "steps": [\n    {\n      "type": "command",\n      "command": "show version"\n    }\n  ]\n}' : undefined}
+                >
+                  <TextArea 
+                    rows={15} 
+                    placeholder={currentType === 'job' ? 
+                      '请输入JSON格式的作业配置' : 
+                      '请输入配置内容'
+                    } 
+                  />
+                </Form.Item>
                 <Button
                   type="primary"
                   onClick={handleSave}

@@ -39,11 +39,7 @@ const ConfigGeneratorPage: React.FC = () => {
   const fetchTemplates = async () => {
     setLoading(true);
     try {
-      const response = await request.get('/api/config/files', {
-        params: {
-          type: 'jinja2'
-        }
-      });
+      const response = await request.get('/api/config-generator/templates');
       setConfigs(response.data);
     } catch (error: any) {
       message.error('加载模板列表失败: ' + (error.response?.data?.detail || error.message));

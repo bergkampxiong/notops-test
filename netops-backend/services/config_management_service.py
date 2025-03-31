@@ -4,6 +4,8 @@ from database.config_management_models import ConfigFile as DBConfigFile
 from schemas.config_management import ConfigFileCreate, ConfigFileUpdate, ConfigFile
 from datetime import datetime
 from sqlalchemy import and_
+from sqlalchemy.sql import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 class ConfigManagementService:
     def __init__(self, db: Session):
@@ -18,43 +20,38 @@ class ConfigManagementService:
         tags: Optional[List[str]] = None,
         status: Optional[str] = None,
         start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
+        end_date: Optional[datetime] = None,
+        template_type: Optional[str] = None
     ) -> List[ConfigFile]:
         try:
             # 构建基础查询
             query = self.db.query(DBConfigFile)
             
-            # 构建过滤条件列表
-            filters = []
-            
             # 应用过滤条件
             if name:
-                filters.append(DBConfigFile.name.ilike(f"%{name}%"))
+                query = query.filter(DBConfigFile.name.ilike(f"%{name}%"))
             if device_type:
-                print(f"Filtering by device_type: {device_type}")  # 添加日志
-                filters.append(DBConfigFile.device_type == device_type)
+                query = query.filter(DBConfigFile.device_type == device_type)
             if status:
-                filters.append(DBConfigFile.status == status)
+                query = query.filter(DBConfigFile.status == status)
             if start_date:
-                filters.append(DBConfigFile.created_at >= start_date)
+                query = query.filter(DBConfigFile.created_at >= start_date)
             if end_date:
-                filters.append(DBConfigFile.created_at <= end_date)
-            
-            # 应用所有过滤条件
-            if filters:
-                print(f"Applying filters: {filters}")  # 添加日志
-                query = query.filter(and_(*filters))
+                query = query.filter(DBConfigFile.created_at <= end_date)
+            if template_type:
+                query = query.filter(DBConfigFile.template_type == template_type)
             
             # 执行查询
-            print(f"Executing query: {query}")  # 添加日志
             configs = query.offset(skip).limit(limit).all()
+            
+            # 手动过滤template_type
+            if template_type:
+                configs = [config for config in configs if config.template_type == template_type]
             
             # 转换为响应模型
             result = [self._convert_to_response_model(config) for config in configs]
-            print(f"Found {len(result)} configs")  # 添加日志
             return result
         except Exception as e:
-            print(f"Error in get_configs: {str(e)}")  # 添加日志
             raise Exception(f"获取配置列表失败: {str(e)}")
 
     def get_config(self, config_id: int) -> Optional[ConfigFile]:

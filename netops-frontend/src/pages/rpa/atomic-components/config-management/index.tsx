@@ -10,7 +10,7 @@ const { TextArea } = Input;
 const { Option } = Select;
 
 interface ConfigFile {
-  id: string;
+  id: number;
   name: string;
   template_type: string;
   content: string;
@@ -20,6 +20,8 @@ interface ConfigFile {
   updated_by: string;
   device_type: string;
   status: string;
+  description?: string;
+  tags?: string[];
   versions?: Array<{
     version: number;
     content: string;
@@ -28,6 +30,26 @@ interface ConfigFile {
     created_by: string;
   }>;
 }
+
+type TemplateType = 'jinja2' | 'textfsm' | 'job';
+
+interface TemplateTypeInfo {
+  color: string;
+  text: string;
+}
+
+const TEMPLATE_TYPE_MAP: Record<TemplateType, TemplateTypeInfo> = {
+  'jinja2': { color: 'blue', text: 'Jinja2 模板' },
+  'textfsm': { color: 'green', text: 'TextFSM 模板' },
+  'job': { color: 'orange', text: '作业配置' }
+};
+
+const getTemplateTypeInfo = (type: string): TemplateTypeInfo => {
+  console.log('获取模板类型信息:', { type });  // 添加日志
+  const result = TEMPLATE_TYPE_MAP[type as TemplateType] || { color: 'purple', text: '其他' };
+  console.log('返回的类型信息:', result);  // 添加日志
+  return result;
+};
 
 const ConfigManagement: React.FC = () => {
   const [form] = Form.useForm();
@@ -111,21 +133,9 @@ const ConfigManagement: React.FC = () => {
       dataIndex: 'template_type',
       key: 'template_type',
       render: (type: string) => {
-        console.log('渲染配置类型:', {
-          value: type,
-          type: typeof type,
-          raw: JSON.stringify(type)
-        });
-        
-        const typeMap = {
-          'jinja2': { color: 'blue', text: 'Jinja2 模板' },
-          'textfsm': { color: 'green', text: 'TextFSM 模板' },
-          'job': { color: 'orange', text: '作业配置' }
-        } as const;
-        
-        const typeInfo = typeMap[type as keyof typeof typeMap] || { color: 'purple', text: '其他' };
-        console.log('选择的类型信息:', typeInfo);
-        
+        console.log('渲染模板类型:', { type });  // 添加日志
+        const typeInfo = getTemplateTypeInfo(type);
+        console.log('渲染使用的类型信息:', typeInfo);  // 添加日志
         return (
           <Tag color={typeInfo.color}>
             {typeInfo.text}
@@ -196,7 +206,7 @@ const ConfigManagement: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     Modal.confirm({
       title: '确认删除',
       content: '确定要删除这个配置吗？此操作不可恢复。',
@@ -216,10 +226,10 @@ const ConfigManagement: React.FC = () => {
 
   const handleCopy = async (record: ConfigFile) => {
     try {
+      const { id, ...copyData } = record;
       const response = await request.post('/api/config/files', {
-        ...record,
+        ...copyData,
         name: `${record.name}_copy`,
-        id: undefined,
       });
       message.success('复制成功');
       setConfigs([...configs, response.data]);
@@ -244,23 +254,8 @@ const ConfigManagement: React.FC = () => {
         }
       }
 
-      console.log('提交的表单数据:', values);  // 添加日志
-
       if (editingConfig) {
         // 更新配置
-        console.log('发送更新请求:', {
-          id: editingConfig.id,
-          data: {
-            name: values.name,
-            template_type: values.template_type,
-            content: values.content,
-            device_type: values.device_type,
-            status: values.status || 'draft',
-            description: values.description || null,
-            tags: values.tags || []
-          }
-        });  // 添加日志
-        
         const response = await request.put(`/api/config/files/${editingConfig.id}`, {
           name: values.name,
           template_type: values.template_type,
@@ -271,23 +266,12 @@ const ConfigManagement: React.FC = () => {
           tags: values.tags || []
         });
         
-        console.log('更新响应:', response.data);  // 添加日志
         message.success('更新成功');
         setConfigs(configs.map(config => 
           config.id === editingConfig.id ? response.data : config
         ));
       } else {
         // 创建新配置
-        console.log('发送创建请求:', {
-          name: values.name,
-          template_type: values.template_type,
-          content: values.content,
-          device_type: values.device_type,
-          status: values.status || 'draft',
-          description: values.description || null,
-          tags: values.tags || []
-        });  // 添加日志
-        
         const response = await request.post('/api/config/files', {
           name: values.name,
           template_type: values.template_type,
@@ -298,7 +282,6 @@ const ConfigManagement: React.FC = () => {
           tags: values.tags || []
         });
         
-        console.log('创建响应:', response.data);  // 添加日志
         setConfigs([...configs, response.data]);
         message.success('创建成功');
       }
