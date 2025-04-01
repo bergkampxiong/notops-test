@@ -1,15 +1,19 @@
 import React from 'react';
+import { UploadOutlined } from '@ant-design/icons';
 import { PDBaseNode } from './pd-base-node';
-import { PDNodeType } from '../../../types/process-designer/pd-types';
+import { PDNodeData } from '../../../types/process-designer/pd-types';
 
-export const PDConfigDeployNode: React.FC<{ data: any }> = ({ data }) => {
+interface PDConfigDeployNodeProps {
+  data: PDNodeData;
+}
+
+export const PDConfigDeployNode: React.FC<PDConfigDeployNodeProps> = ({ data }) => {
   return (
     <PDBaseNode
-      data={{
-        ...data,
-        type: PDNodeType.CONFIG_DEPLOY,
-      }}
+      data={data}
+      type="配置下发节点"
       className="pd-config-deploy-node"
+      icon={<UploadOutlined style={{ fontSize: 16, color: '#eb2f96' }} />}
     />
   );
 }; 

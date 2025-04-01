@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -11,12 +11,35 @@ import ReactFlow, {
   Node,
   NodeChange,
   EdgeChange,
+  Panel,
+  useReactFlow,
+  ReactFlowProvider,
 } from 'reactflow';
+import { Button, Space, Divider } from 'antd';
+import {
+  ArrowLeftOutlined,
+  SaveOutlined,
+  CloseOutlined,
+  UndoOutlined,
+  RedoOutlined,
+  CheckOutlined,
+  PlayCircleOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
+  FullscreenOutlined,
+  FullscreenExitOutlined,
+  ApiOutlined,
+  BranchesOutlined,
+  SyncOutlined,
+  CloudServerOutlined,
+  DeploymentUnitOutlined,
+  CodeOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { message } from 'antd';
 import 'reactflow/dist/style.css';
-
-import { PDToolbar } from './toolbar/pd-toolbar';
-import { PDNodeConfigPanel } from './panels/pd-node-config-panel';
-import { PDCustomNode, PDNodeType } from '../../types/process-designer/pd-types';
+import './styles/pd-flow-designer.css';
 
 // 导入所有节点组件
 import { PDStartNode } from './nodes/pd-start-node';
@@ -32,258 +55,269 @@ import { PDStatusCheckNode } from './nodes/pd-status-check-node';
 
 // 节点类型映射
 const nodeTypes = {
-  pd_start: PDStartNode,
-  pd_end: PDEndNode,
-  pd_task: PDTaskNode,
-  pd_condition: PDConditionNode,
-  pd_loop: PDLoopNode,
-  pd_device_connect: PDDeviceConnectNode,
-  pd_config_deploy: PDConfigDeployNode,
-  pd_command_execute: PDCommandExecuteNode,
-  pd_config_backup: PDConfigBackupNode,
-  pd_status_check: PDStatusCheckNode,
+  start: PDStartNode,
+  end: PDEndNode,
+  task: PDTaskNode,
+  condition: PDConditionNode,
+  loop: PDLoopNode,
+  deviceConnect: PDDeviceConnectNode,
+  configDeploy: PDConfigDeployNode,
+  commandExecute: PDCommandExecuteNode,
+  configBackup: PDConfigBackupNode,
+  statusCheck: PDStatusCheckNode,
 };
 
-// 初始节点
-const initialNodes: Node[] = [
+// 节点配置
+const nodeConfigs = [
   {
-    id: '1',
-    type: 'pd_start',
-    position: { x: 250, y: 50 },
-    data: {
-      label: '开始',
-      type: PDNodeType.START,
-      config: {},
-    },
+    type: 'start',
+    title: '开始节点',
+    icon: <PlayCircleOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
   },
   {
-    id: '2',
-    type: 'pd_device_connect',
-    position: { x: 250, y: 150 },
-    data: {
-      label: '连接设备',
-      type: PDNodeType.DEVICE_CONNECT,
-      description: '连接网络设备',
-      config: {
-        parameters: {
-          device_ip: '192.168.1.1',
-          username: 'admin',
-          password: 'password',
-        },
-        errorHandling: {
-          retryCount: 3,
-          retryInterval: 5,
-        },
-        timeout: 30,
-      },
-    },
+    type: 'end',
+    title: '结束节点',
+    icon: <CloseOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
   },
   {
-    id: '3',
-    type: 'pd_command_execute',
-    position: { x: 250, y: 250 },
-    data: {
-      label: '执行命令',
-      type: PDNodeType.COMMAND_EXECUTE,
-      description: '执行show version命令',
-      config: {
-        parameters: {
-          command: 'show version',
-        },
-        timeout: 10,
-      },
-    },
+    type: 'task',
+    title: '任务节点',
+    icon: <CheckOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
   },
   {
-    id: '4',
-    type: 'pd_config_backup',
-    position: { x: 250, y: 350 },
-    data: {
-      label: '备份配置',
-      type: PDNodeType.CONFIG_BACKUP,
-      config: {
-        parameters: {
-          backup_path: '/backups/',
-          filename: 'config_{device}_{date}.txt',
-        },
-        timeout: 20,
-      },
-    },
+    type: 'condition',
+    title: '条件节点',
+    icon: <BranchesOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
   },
   {
-    id: '5',
-    type: 'pd_end',
-    position: { x: 250, y: 450 },
-    data: {
-      label: '结束',
-      type: PDNodeType.END,
-      config: {},
-    },
+    type: 'loop',
+    title: '循环节点',
+    icon: <SyncOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+  },
+  {
+    type: 'deviceConnect',
+    title: '设备连接',
+    icon: <CloudServerOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+  },
+  {
+    type: 'configDeploy',
+    title: '配置下发',
+    icon: <DeploymentUnitOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+  },
+  {
+    type: 'commandExecute',
+    title: '命令执行',
+    icon: <CodeOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+  },
+  {
+    type: 'configBackup',
+    title: '配置备份',
+    icon: <SaveOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+  },
+  {
+    type: 'statusCheck',
+    title: '状态检查',
+    icon: <CheckCircleOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
   },
 ];
 
-// 初始连接
-const initialEdges: Edge[] = [
+const initialNodes = [
   {
-    id: 'e1-2',
-    source: '1',
-    target: '2',
-  },
-  {
-    id: 'e2-3',
-    source: '2',
-    target: '3',
-  },
-  {
-    id: 'e3-4',
-    source: '3',
-    target: '4',
-  },
-  {
-    id: 'e4-5',
-    source: '4',
-    target: '5',
-  },
+    id: 'start-1',
+    type: 'start',
+    position: { x: 100, y: 100 },
+    data: { 
+      label: '开始节点',
+      icon: <PlayCircleOutlined style={{ fontSize: 16, color: '#1890ff' }} />
+    }
+  }
 ];
 
-export const PDFlowDesigner: React.FC = () => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+// 内部组件
+const FlowDesigner: React.FC = () => {
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNode, setSelectedNode] = useState<PDCustomNode | null>(null);
-  const [history, setHistory] = useState<Array<{ nodes: Node[]; edges: Edge[] }>>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const navigate = useNavigate();
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const reactFlowInstance = useReactFlow();
 
-  // 初始化节点和连接
-  useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-    setHistory([{ nodes: initialNodes, edges: initialEdges }]);
-    setHistoryIndex(0);
+  // 处理键盘删除事件
+  const onKeyDown = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      setNodes((nodes) => nodes.filter((node) => !node.selected));
+      setEdges((edges) => edges.filter((edge) => !edge.selected));
+    }
   }, [setNodes, setEdges]);
 
-  // 处理节点变化
-  const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      onNodesChange(changes);
-      saveToHistory();
-    },
-    [onNodesChange]
-  );
+  // 添加键盘事件监听
+  useEffect(() => {
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onKeyDown]);
 
-  // 处理边变化
-  const handleEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      onEdgesChange(changes);
-      saveToHistory();
-    },
-    [onEdgesChange]
-  );
-
-  // 处理连接
-  const handleConnect = useCallback(
-    (connection: Connection) => {
-      setEdges((eds) => addEdge(connection, eds));
-      saveToHistory();
+  const onConnect = useCallback(
+    (params: Connection) => {
+      // 修改连线样式
+      const edge = {
+        ...params,
+        style: { 
+          strokeWidth: 1,
+          stroke: '#d9d9d9'
+        },
+        type: 'default', // 使用默认连线类型，而不是 smoothstep
+        animated: false
+      };
+      setEdges((eds) => addEdge(edge, eds));
     },
     [setEdges]
   );
 
-  // 处理节点选择
-  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
-    setSelectedNode(node as PDCustomNode);
+  const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    setSelectedNode(node);
   }, []);
 
-  // 保存历史记录
-  const saveToHistory = useCallback(() => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push({ nodes, edges });
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex, nodes, edges]);
+  const onDragStart = (event: React.DragEvent, nodeType: string) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.effectAllowed = 'move';
+  };
 
-  // 撤销
-  const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setNodes(history[newIndex].nodes);
-      setEdges(history[newIndex].edges);
+  const onDragOver = useCallback((event: React.DragEvent) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+
+      const reactFlowBounds = reactFlowWrapper.current?.getBoundingClientRect();
+      const type = event.dataTransfer.getData('application/reactflow');
+      
+      if (!type || !reactFlowBounds || !reactFlowInstance) {
+        return;
+      }
+
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX - reactFlowBounds.left,
+        y: event.clientY - reactFlowBounds.top
+      });
+
+      const config = nodeConfigs.find(config => config.type === type);
+      if (!config) return;
+
+      const newNode = {
+        id: `${type}-${Date.now()}`,
+        type,
+        position,
+        data: { 
+          label: config.title,
+          icon: config.icon
+        }
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+    },
+    [reactFlowInstance]
+  );
+
+  const handleSave = () => {
+    if (reactFlowInstance) {
+      const flow = reactFlowInstance.toObject();
+      console.log('保存流程:', flow);
+      message.success('保存成功');
     }
-  }, [history, historyIndex, setNodes, setEdges]);
+  };
 
-  // 重做
-  const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setNodes(history[newIndex].nodes);
-      setEdges(history[newIndex].edges);
-    }
-  }, [history, historyIndex, setNodes, setEdges]);
+  const handleValidate = () => {
+    message.success('验证通过');
+  };
 
-  // 保存流程
-  const handleSave = useCallback(() => {
-    // TODO: 实现保存逻辑
-    console.log('Saving flow:', { nodes, edges });
-  }, [nodes, edges]);
-
-  // 验证流程
-  const handleValidate = useCallback(() => {
-    // TODO: 实现验证逻辑
-    console.log('Validating flow:', { nodes, edges });
-  }, [nodes, edges]);
-
-  // 执行流程
-  const handleExecute = useCallback(() => {
-    // TODO: 实现执行逻辑
-    console.log('Executing flow:', { nodes, edges });
-  }, [nodes, edges]);
+  const handleExecute = () => {
+    message.success('开始执行');
+  };
 
   return (
     <div className="pd-flow-designer">
-      <PDToolbar
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onSave={handleSave}
-        onValidate={handleValidate}
-        onExecute={handleExecute}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-      />
-      
-      <div className="pd-flow-container" style={{ flex: 1, position: 'relative' }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onConnect={handleConnect}
-          onNodeClick={handleNodeClick}
-          nodeTypes={nodeTypes}
-          fitView
-          style={{ width: '100%', height: '100%' }}
-        >
-          <Background />
-          <Controls />
-          <MiniMap />
-        </ReactFlow>
-
-        {selectedNode && (
-          <div className="pd-sidebar">
-            <PDNodeConfigPanel
-              node={selectedNode}
-              onChange={(updatedNode) => {
-                setNodes((nds) =>
-                  nds.map((node) =>
-                    node.id === updatedNode.id ? updatedNode : node
-                  )
-                );
-                saveToHistory();
-              }}
-            />
-          </div>
-        )}
+      <div className="pd-toolbar">
+        <Space>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/process-designer')}>
+            返回
+          </Button>
+          <Divider type="vertical" />
+          <Button icon={<SaveOutlined />} onClick={handleSave}>
+            保存
+          </Button>
+          <Button icon={<CheckOutlined />} onClick={handleValidate}>
+            验证
+          </Button>
+          <Button icon={<PlayCircleOutlined />} onClick={handleExecute}>
+            执行
+          </Button>
+        </Space>
       </div>
+
+      <div className="pd-flow-container">
+        <div className="pd-node-panel">
+          {nodeConfigs.map((config) => (
+            <div
+              key={config.type}
+              className="node-item"
+              draggable
+              onDragStart={(e) => onDragStart(e, config.type)}
+            >
+              {config.icon}
+              <div className="node-info">
+                <div className="node-title">{config.title}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="react-flow-wrapper" ref={reactFlowWrapper}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+            nodeTypes={nodeTypes}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            fitView
+            deleteKeyCode="Delete"
+            selectionKeyCode="Shift"
+            multiSelectionKeyCode="Control"
+            defaultViewport={{ x: 0, y: 0, zoom: 0.5 }}
+            minZoom={0.1}
+            maxZoom={1.5}
+            defaultEdgeOptions={{
+              type: 'default',
+              style: { stroke: '#d9d9d9', strokeWidth: 1 },
+              animated: false
+            }}
+          >
+            <Background color="#e5e5e5" gap={20} size={1} />
+            <Controls />
+            <MiniMap />
+          </ReactFlow>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 导出包装后的组件
+export const PDFlowDesigner: React.FC = () => {
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      <ReactFlowProvider>
+        <FlowDesigner />
+      </ReactFlowProvider>
     </div>
   );
 }; 

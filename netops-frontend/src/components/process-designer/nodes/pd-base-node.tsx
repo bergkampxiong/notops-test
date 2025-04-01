@@ -1,49 +1,39 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
-import { PDCustomNode } from '../../../types/process-designer/pd-types';
+import { PDNodeData } from '../../../types/process-designer/pd-types';
 
 interface PDBaseNodeProps {
-  data: PDCustomNode['data'];
-  isConnectable?: boolean;
-  hasInput?: boolean;
-  hasOutput?: boolean;
+  data: PDNodeData;
+  type: string;
   className?: string;
+  icon: React.ReactNode;
 }
 
 export const PDBaseNode: React.FC<PDBaseNodeProps> = ({
   data,
-  isConnectable = true,
-  hasInput = true,
-  hasOutput = true,
   className = '',
+  icon,
 }) => {
   return (
     <div className={`pd-node ${className}`}>
-      {isConnectable && hasInput && (
-        <Handle
-          type="target"
-          position={Position.Top}
-          className="pd-handle pd-handle-top"
-        />
-      )}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="pd-handle pd-handle-top"
+      />
       
-      <div className="pd-node-content">
-        <div className="pd-node-header">
-          <span className="pd-node-type">{data.type}</span>
-          <span className="pd-node-label">{data.label}</span>
+      <div className="node-content">
+        {icon}
+        <div className="node-info">
+          <div className="node-title">{data.label}</div>
         </div>
-        {data.description && (
-          <div className="pd-node-description">{data.description}</div>
-        )}
       </div>
 
-      {isConnectable && hasOutput && (
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="pd-handle pd-handle-bottom"
-        />
-      )}
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="pd-handle pd-handle-bottom"
+      />
     </div>
   );
 }; 

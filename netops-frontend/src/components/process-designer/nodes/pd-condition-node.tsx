@@ -1,17 +1,34 @@
 import React from 'react';
 import { Handle, Position } from 'reactflow';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import { PDBaseNode } from './pd-base-node';
-import { PDNodeType } from '../../../types/process-designer/pd-types';
+import { PDNodeData } from '../../../types/process-designer/pd-types';
 
-export const PDConditionNode: React.FC<{ data: any }> = ({ data }) => {
+interface PDConditionNodeProps {
+  data: PDNodeData;
+}
+
+export const PDConditionNode: React.FC<PDConditionNodeProps> = ({ data }) => {
   return (
     <div className="pd-condition-node">
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="pd-handle pd-handle-top"
+      />
+      
       <PDBaseNode
-        data={{
-          ...data,
-          type: PDNodeType.CONDITION,
-        }}
-        className="pd-condition-content"
+        data={data}
+        type="条件节点"
+        className="pd-condition-node-content"
+        icon={<QuestionCircleOutlined style={{ fontSize: 16, color: '#faad14' }} />}
+      />
+
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="false"
+        className="pd-handle pd-handle-left"
       />
       <Handle
         type="source"
@@ -21,9 +38,8 @@ export const PDConditionNode: React.FC<{ data: any }> = ({ data }) => {
       />
       <Handle
         type="source"
-        position={Position.Left}
-        id="false"
-        className="pd-handle pd-handle-left"
+        position={Position.Bottom}
+        className="pd-handle pd-handle-bottom"
       />
     </div>
   );

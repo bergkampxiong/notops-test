@@ -1,15 +1,19 @@
 import React from 'react';
+import { ToolOutlined } from '@ant-design/icons';
 import { PDBaseNode } from './pd-base-node';
-import { PDNodeType } from '../../../types/process-designer/pd-types';
+import { PDNodeData } from '../../../types/process-designer/pd-types';
 
-export const PDTaskNode: React.FC<{ data: any }> = ({ data }) => {
+interface PDTaskNodeProps {
+  data: PDNodeData;
+}
+
+export const PDTaskNode: React.FC<PDTaskNodeProps> = ({ data }) => {
   return (
     <PDBaseNode
-      data={{
-        ...data,
-        type: PDNodeType.TASK,
-      }}
+      data={data}
+      type="任务节点"
       className="pd-task-node"
+      icon={<ToolOutlined style={{ fontSize: 16, color: '#1890ff' }} />}
     />
   );
 }; 

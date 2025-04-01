@@ -45,10 +45,9 @@ const TEMPLATE_TYPE_MAP: Record<TemplateType, TemplateTypeInfo> = {
 };
 
 const getTemplateTypeInfo = (type: string): TemplateTypeInfo => {
-  console.log('获取模板类型信息:', { type });  // 添加日志
-  const result = TEMPLATE_TYPE_MAP[type as TemplateType] || { color: 'purple', text: '其他' };
-  console.log('返回的类型信息:', result);  // 添加日志
-  return result;
+  // 确保type是有效的模板类型
+  const validType = type as TemplateType;
+  return TEMPLATE_TYPE_MAP[validType] || { color: 'purple', text: '其他' };
 };
 
 const ConfigManagement: React.FC = () => {
@@ -133,9 +132,7 @@ const ConfigManagement: React.FC = () => {
       dataIndex: 'template_type',
       key: 'template_type',
       render: (type: string) => {
-        console.log('渲染模板类型:', { type });  // 添加日志
         const typeInfo = getTemplateTypeInfo(type);
-        console.log('渲染使用的类型信息:', typeInfo);  // 添加日志
         return (
           <Tag color={typeInfo.color}>
             {typeInfo.text}

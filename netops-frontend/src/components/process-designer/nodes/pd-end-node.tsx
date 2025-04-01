@@ -1,16 +1,23 @@
 import React from 'react';
-import { PDBaseNode } from './pd-base-node';
-import { PDNodeType } from '../../../types/process-designer/pd-types';
+import { Handle, Position } from 'reactflow';
+import { StopOutlined } from '@ant-design/icons';
 
-export const PDEndNode: React.FC<{ data: any }> = ({ data }) => {
+interface NodeData {
+  label: string;
+  icon?: React.ReactNode;
+}
+
+export const PDEndNode: React.FC<{ data: NodeData }> = ({ data }) => {
   return (
-    <PDBaseNode
-      data={{
-        ...data,
-        type: PDNodeType.END,
-      }}
-      hasOutput={false}
-      className="pd-end-node"
-    />
+    <div className="pd-node pd-end-node">
+      <Handle type="target" position={Position.Top} className="pd-handle pd-handle-top" />
+      <div className="node-content">
+        <StopOutlined style={{ fontSize: 16, color: '#ff4d4f' }} />
+        <div className="node-info">
+          <div className="node-title">{data.label}</div>
+        </div>
+      </div>
+      <Handle type="source" position={Position.Bottom} className="pd-handle pd-handle-bottom" />
+    </div>
   );
 }; 

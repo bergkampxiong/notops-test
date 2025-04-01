@@ -59,11 +59,63 @@ export interface PDNodeConfigProps {
 
 // 工具栏配置
 export interface PDToolbarConfig {
+  onSave: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onSave: () => void;
   onValidate: () => void;
   onExecute: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  onToggleNodePanel?: () => void;
+  onToggleConfigPanel?: () => void;
+}
+
+export interface PDFlowDesignerProps {
+  initialData: ProcessDefinition;
+  readOnly?: boolean;
+  executionData?: {
+    nodeStates: Record<string, any>;
+    variables: Record<string, any>;
+  };
+  onSave?: (data: ProcessDefinition) => void;
+  onCancel?: () => void;
+}
+
+export interface ProcessDefinition {
+  id: string;
+  name: string;
+  description: string;
+  version: number;
+  status: 'draft' | 'published' | 'disabled';
+  nodes: Node[];
+  edges: Edge[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProcessInstance {
+  id: string;
+  processDefinitionId: string;
+  name: string;
+  variables: Record<string, any>;
+  status: 'running' | 'suspended' | 'completed' | 'failed';
+  nodeStates: Record<string, any>;
+  startedAt: string;
+  endedAt?: string;
+}
+
+export interface PDNodePanelProps {
+  onDragStart: (event: React.DragEvent, nodeType: string) => void;
+}
+
+export interface PDValidationPanelProps {
+  nodes: Node[];
+  edges: Edge[];
+  onClose: () => void;
+}
+
+export interface PDNodeConfigPanelProps {
+  node: Node;
+  onChange: (node: Node) => void;
+  onClose: () => void;
 } 
