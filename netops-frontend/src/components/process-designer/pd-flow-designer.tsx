@@ -72,52 +72,47 @@ const nodeConfigs = [
   {
     type: 'start',
     title: '开始节点',
-    icon: <PlayCircleOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <PlayCircleOutlined style={{ fontSize: 26, color: '#1890ff' }} />,
   },
   {
     type: 'end',
     title: '结束节点',
-    icon: <CloseOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <CloseOutlined style={{ fontSize: 26, color: '#ff4d4f' }} />,
   },
   {
     type: 'task',
     title: '任务节点',
-    icon: <CheckOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <CheckOutlined style={{ fontSize: 26, color: '#1890ff' }} />,
   },
   {
     type: 'condition',
     title: '条件节点',
-    icon: <BranchesOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
-  },
-  {
-    type: 'loop',
-    title: '循环节点',
-    icon: <SyncOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <BranchesOutlined style={{ fontSize: 26, color: '#faad14' }} />,
   },
   {
     type: 'deviceConnect',
     title: '设备连接',
-    icon: <CloudServerOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <CloudServerOutlined style={{ fontSize: 26, color: '#13c2c2' }} />,
   },
   {
     type: 'configDeploy',
     title: '配置下发',
-    icon: <DeploymentUnitOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <DeploymentUnitOutlined style={{ fontSize: 26, color: '#eb2f96' }} />,
   },
   {
     type: 'commandExecute',
     title: '命令执行',
-    icon: <CodeOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <CodeOutlined style={{ fontSize: 26, color: '#fa8c16' }} />,
   },
   {
     type: 'configBackup',
     title: '配置备份',
-    icon: <SaveOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <SaveOutlined style={{ fontSize: 26, color: '#2f54eb' }} />,
   },
   {
     type: 'statusCheck',
     title: '状态检查',
-    icon: <CheckCircleOutlined style={{ fontSize: 16, color: '#1890ff' }} />,
+    icon: <CheckCircleOutlined style={{ fontSize: 26, color: '#52c41a' }} />,
   },
 ];
 
