@@ -1,16 +1,34 @@
-fastapi==0.95.0
-uvicorn==0.21.1
-sqlalchemy==2.0.7
-passlib==1.7.4
-python-jose==3.3.0
+# FastAPI and related packages
+fastapi==0.88.0
+uvicorn==0.20.0
 python-multipart==0.0.6
+pydantic==1.10.2
+
+# Database
+sqlalchemy==2.0.7
+alembic==1.11.1
+
+# Authentication and Security
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
 bcrypt==4.0.1
-pydantic==1.10.7
-redis==4.5.4
 pyotp==2.8.0
-qrcode==7.4.2
-pillow==9.5.0
+
+# LDAP Support
 ldap3==2.9.1
+
+# Redis for caching and session
+redis==4.5.4
+
+# Task Scheduling
 apscheduler==3.11.0
-# 以下包是可选的，如果不需要Prefect可以注释掉
-# prefect==2.14.12 
+
+# QR Code Generation
+qrcode==7.4.2
+pillow==10.4.0
+
+# HTTP Client
+httpx==0.24.1
+
+# Optional packages
+# prefect==2.14.12  # Workflow automation (optional) 
