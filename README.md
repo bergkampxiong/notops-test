@@ -1,141 +1,112 @@
-# 网络自动化运维平台
+# NetOps 网络自动化平台
 
-基于React + NestJS + TypeORM + Netmiko的网络自动化运维平台，支持网络设备配置管理、自动化运维和流程编排。
+NetOps 是一个现代化的网络自动化平台，旨在简化网络设备管理、配置自动化、监控和故障排除过程。该平台采用前后端分离架构，提供直观的用户界面和强大的API接口。
 
-## 功能特性
+## 功能特点
 
-### 1. 流程设计器
-- 基于ReactFlow的流程编排功能
-- 支持多种节点类型：
-  - 开始/结束节点
-  - 任务节点（支持自定义业务逻辑）
-  - 条件节点（支持流程分支控制）
-  - 设备连接节点（支持多设备并行连接）
-  - 配置下发节点（支持多设备配置部署）
-  - 命令执行节点（支持多设备命令执行）
-  - 配置备份节点（支持多设备配置备份）
-  - 状态检查节点（支持多设备状态监控）
-- 支持节点拖拽、连线、删除等操作
-- 支持流程保存、加载和发布
+- **设备管理**：集中管理网络设备，包括交换机、路由器、防火墙等
+- **配置自动化**：通过模板系统自动生成和部署配置
+- **变更管理**：记录和跟踪所有配置变更，支持版本回滚
+- **批量操作**：同时对多个设备执行命令或配置修改
+- **安全策略管理**：集中管理和部署安全策略
+- **定时任务**：计划执行自动化任务
+- **API集成**：提供RESTful API实现与其他系统集成
+- **用户权限管理**：基于角色的访问控制
 
-### 2. 设备管理
-- 支持多种网络设备类型（思科、华为等）
-- 设备连接信息管理
-- 设备状态监控
-- 配置备份和恢复
+## 系统架构
 
-### 3. 自动化运维
-- 基于Netmiko的多设备并行操作
-- 配置模板管理
-- 命令执行
-- 状态检查
-- 告警处理
-
-## 技术栈
-
-### 前端
-- React 18
-- TypeScript
-- Ant Design 5.x
-- ReactFlow
-- Axios
-
-### 后端
-- NestJS
-- TypeORM
-- Netmiko
-- PostgreSQL
-- Redis
-
-## 快速开始
-
-### 环境要求
-- Node.js >= 16
-- Python >= 3.8
-- PostgreSQL >= 12
-- Redis >= 6
-
-### 安装依赖
-
-前端：
-```bash
-cd netops-frontend
-npm install
-```
-
-后端：
-```bash
-cd netops-backend
-npm install
-pip install -r requirements.txt
-```
-
-### 配置
-1. 复制环境配置文件：
-```bash
-# 前端
-cp netops-frontend/.env.example netops-frontend/.env
-
-# 后端
-cp netops-backend/.env.example netops-backend/.env
-```
-
-2. 修改配置文件中的数据库连接信息和其他必要配置
-
-### 启动服务
-
-前端：
-```bash
-cd netops-frontend
-npm run dev
-```
-
-后端：
-```bash
-cd netops-backend
-npm run start:dev
-```
+- **前端**：基于React的现代化Web应用
+- **后端**：基于FastAPI的高性能API服务
+- **数据库**：支持SQLite快速部署和PostgreSQL生产环境
+- **任务队列**：异步任务处理系统
+- **配置系统**：基于Jinja2的模板引擎
 
 ## 项目结构
 
 ```
 netops/
-├── netops-frontend/          # 前端项目
-│   ├── src/
-│   │   ├── components/      # 组件
-│   │   ├── pages/          # 页面
-│   │   ├── api/            # API接口
-│   │   └── utils/          # 工具函数
-│   └── package.json
-│
-└── netops-backend/          # 后端项目
-    ├── src/
-    │   ├── controllers/    # 控制器
-    │   ├── services/       # 服务
-    │   ├── entities/       # 实体
-    │   └── utils/          # 工具函数
-    └── package.json
+├── netops-backend/    # 后端服务
+└── netops-frontend/   # 前端应用
 ```
 
-## 开发计划
+## 快速开始
 
-- [x] 基础框架搭建
-- [x] 流程设计器实现
-- [x] 设备管理功能
-- [x] 自动化运维功能
-- [ ] 用户认证和权限管理
-- [ ] 操作日志和审计
-- [ ] 监控告警集成
-- [ ] 报表统计功能
+### 安装要求
+
+- Python 3.8+
+- Node.js 16+
+- SQLite3 (开发) / PostgreSQL 13+ (生产)
+
+### 安装步骤
+
+详细的安装步骤请参考 [安装文档](INSTALL.md)
+
+## 基本使用
+
+1. 访问系统
+   - 前端界面：http://localhost:3000
+   - API文档：http://localhost:8000/docs
+
+2. 登录系统
+   - 默认管理员账号：admin
+   - 默认密码：admin
+
+3. 添加设备
+   - 在设备管理页面添加网络设备信息
+   - 支持批量导入设备
+
+4. 创建配置模板
+   - 使用Jinja2语法创建可复用的配置模板
+   - 支持变量、条件和循环
+
+5. 执行自动化任务
+   - 创建自动化工作流
+   - 配置定时任务
+
+## 开发指南
+
+如果您想为项目贡献代码，请参考 [开发指南](DEVELOPMENT.md)
+
+## 数据库管理
+
+平台支持数据库备份和恢复功能：
+
+### 备份数据库
+
+```bash
+python backup_database.py
+```
+
+### 恢复数据库
+
+```bash
+python restore_database.py <备份文件路径>
+```
+
+## 版本历史
+
+- **v1.0.0** (2025-04-01)
+  - 初始版本发布
+  - 基本设备管理功能
+  - 配置模板系统
+  - 用户权限管理
 
 ## 贡献指南
 
-1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建Pull Request
+欢迎贡献代码、报告问题或提出改进建议。请参考 [贡献指南](CONTRIBUTING.md)
 
 ## 许可证
 
-MIT License 
+本项目采用 [MIT 许可证](LICENSE)
+
+## 联系方式
+
+- 项目负责人：网络自动化团队
+- 邮箱：support@netops.example.com
+
+## 相关文档
+
+- [安装文档](INSTALL.md)
+- [API文档](API.md)
+- [用户手册](USER_GUIDE.md)
+- [常见问题](FAQ.md) 
