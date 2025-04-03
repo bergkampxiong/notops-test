@@ -14,6 +14,8 @@ import ReactFlow, {
   Panel,
   useReactFlow,
   ReactFlowProvider,
+  MarkerType,
+  ConnectionMode,
 } from 'reactflow';
 import { Button, Space, Divider } from 'antd';
 import {
@@ -156,19 +158,51 @@ const FlowDesigner: React.FC = () => {
 
   const onConnect = useCallback(
     (params: Connection) => {
-      // 修改连线样式
+      // 验证连线
+      const sourceNode = nodes.find(node => node.id === params.source);
+      const targetNode = nodes.find(node => node.id === params.target);
+
+      if (!sourceNode || !targetNode) {
+        return;
+      }
+
+      // 验证连线规则
+      if (sourceNode.type === 'end') {
+        message.error('结束节点不能作为连线起点');
+        return;
+      }
+
+      // 检查是否已存在相同连线
+      const existingEdge = edges.find(
+        edge => edge.source === params.source && edge.target === params.target
+      );
+
+      if (existingEdge) {
+        message.error('该连线已存在');
+        return;
+      }
+
+      // 创建新连线
       const edge = {
         ...params,
+        id: `edge-${params.source}-${params.target}`,
         style: { 
-          strokeWidth: 1,
-          stroke: '#d9d9d9'
+          strokeWidth: 1.5,
+          stroke: '#1890ff'
         },
-        type: 'default', // 使用默认连线类型，而不是 smoothstep
-        animated: false
+        type: 'smoothstep',
+        animated: false,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: '#1890ff',
+          width: 20,
+          height: 20
+        }
       };
+
       setEdges((eds) => addEdge(edge, eds));
     },
-    [setEdges]
+    [nodes, edges, setEdges]
   );
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -291,10 +325,24 @@ const FlowDesigner: React.FC = () => {
             minZoom={0.1}
             maxZoom={1.5}
             defaultEdgeOptions={{
-              type: 'default',
-              style: { stroke: '#d9d9d9', strokeWidth: 1 },
-              animated: false
+              type: 'smoothstep',
+              style: { stroke: '#1890ff', strokeWidth: 1.5 },
+              animated: false,
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+                color: '#1890ff',
+                width: 20,
+                height: 20
+              }
             }}
+            connectionMode={ConnectionMode.Loose}
+            snapToGrid
+            snapGrid={[15, 15]}
+            connectOnClick={false}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            elementsSelectable={true}
+            proOptions={{ hideAttribution: true }}
           >
             <Background color="#e5e5e5" gap={20} size={1} />
             <Controls />

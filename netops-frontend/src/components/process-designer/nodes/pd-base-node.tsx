@@ -20,6 +20,8 @@ export const PDBaseNode: React.FC<PDBaseNodeProps> = ({
         type="target"
         position={Position.Top}
         className="pd-handle pd-handle-top"
+        isConnectable={true}
+        style={{ background: '#fff', border: '1px solid #1890ff' }}
       />
       
       <div className="node-content">
@@ -33,6 +35,8 @@ export const PDBaseNode: React.FC<PDBaseNodeProps> = ({
         type="source"
         position={Position.Bottom}
         className="pd-handle pd-handle-bottom"
+        isConnectable={true}
+        style={{ background: '#fff', border: '1px solid #1890ff' }}
       />
     </div>
   );

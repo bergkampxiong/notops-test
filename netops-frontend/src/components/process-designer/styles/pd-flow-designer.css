@@ -137,28 +137,32 @@
 }
 
 /* 连接点样式 */
-.pd-handle {
-  width: 6px;
-  height: 6px;
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
   background: #fff;
   border: 1px solid #1890ff;
   border-radius: 50%;
 }
 
-.pd-handle-top {
-  top: -3px;
+.react-flow__handle-top {
+  top: -4px;
 }
 
-.pd-handle-bottom {
-  bottom: -3px;
+.react-flow__handle-bottom {
+  bottom: -4px;
 }
 
-.pd-handle-left {
-  left: -3px;
+.react-flow__handle-left {
+  left: -4px;
 }
 
-.pd-handle-right {
-  right: -3px;
+.react-flow__handle-right {
+  right: -4px;
+}
+
+.react-flow__handle:hover {
+  background: #1890ff;
 }
 
 /* 左侧面板节点样式 */
@@ -260,14 +264,47 @@
 }
 
 /* 边样式 */
+.react-flow__edge {
+  pointer-events: all;
+}
+
 .react-flow__edge-path {
-  stroke: #91caff;
-  stroke-width: 1;
+  stroke: #1890ff;
+  stroke-width: 1.5;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: #1890ff;
   stroke-width: 2;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+.react-flow__edge.interactive {
+  cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #40a9ff;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected {
+  z-index: 1;
+}
+
+.react-flow__edge-text {
+  font-size: 12px;
+  fill: #666;
+}
+
+.react-flow__edge-textbg {
+  fill: #fff;
+  stroke: #fff;
+  stroke-width: 3;
 }
 
 /* 控制面板样式 */
@@ -361,4 +398,10 @@
 
 .pd-node-desc {
   display: none;
+}
+
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
 } 

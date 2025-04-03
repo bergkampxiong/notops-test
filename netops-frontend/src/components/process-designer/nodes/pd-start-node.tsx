@@ -1,23 +1,19 @@
 import React from 'react';
-import { Handle, Position } from 'reactflow';
+import { PlayCircleOutlined } from '@ant-design/icons';
+import { PDBaseNode } from './pd-base-node';
+import { PDNodeData } from '../../../types/process-designer/pd-types';
 
-interface NodeData {
-  label: string;
-  description: string;
-  icon: React.ReactNode;
+interface PDStartNodeProps {
+  data: PDNodeData;
 }
 
-export const PDStartNode: React.FC<{ data: NodeData }> = ({ data }) => {
+export const PDStartNode: React.FC<PDStartNodeProps> = ({ data }) => {
   return (
-    <>
-      <Handle type="source" position={Position.Right} />
-      <div className="node-content">
-        {data.icon}
-        <div className="node-info">
-          <div className="node-title">{data.label}</div>
-          <div className="node-desc">{data.description}</div>
-        </div>
-      </div>
-    </>
+    <PDBaseNode
+      data={data}
+      type="开始节点"
+      className="pd-node"
+      icon={<PlayCircleOutlined style={{ fontSize: 16, color: '#1890ff' }} />}
+    />
   );
 }; 
