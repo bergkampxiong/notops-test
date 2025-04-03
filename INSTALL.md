@@ -47,23 +47,24 @@ pip install -r requirements.txt
          "db": 0,                 # Redis数据库编号
      }
      ```
+   - 注意：CMDB数据库使用与netops相同的数据库，无需单独配置
 
 5. 初始化数据库：
 ```bash
-# 使用数据库备份还原（推荐）
-python restore_database.py database_backups/netops_backup_*.sql
+# 运行初始化脚本
+python int_all_db.py
 ```
 
 6. 启动后端服务：
 ```bash
 # 启动API服务
-python -m uvicorn main:app --host 0.0.0.0 --port 8000
+python main.py
 
 # 启动Celery Worker（后台任务）
-python -m celery -A tasks worker --loglevel=info
+celery -A tasks worker --loglevel=info
 
 # 启动Celery Beat（定时任务）
-python -m celery -A tasks beat --loglevel=info
+celery -A tasks beat --loglevel=info
 ```
 
 ### 2. 前端安装
@@ -93,31 +94,32 @@ npm start
 
 ## 数据库管理
 
-### 备份数据库
-```bash
-python backup_database.py
-```
-备份文件保存在 `database_backups` 目录下
+### 数据库初始化
+系统使用统一的数据库初始化脚本，该脚本会：
+1. 创建所有必要的数据库表
+2. 初始化基础数据（设备类型、厂商、位置等）
+3. 创建管理员账户
 
-### 恢复数据库
+如需重新初始化数据库，请运行：
 ```bash
-python restore_database.py <备份文件路径>
+python int_all_db.py
 ```
 
 ## 常见问题
 
 1. 数据库连接失败
-   - 检查数据库服务是否运行
-   - 验证数据库连接信息是否正确
-   - 确认数据库用户权限
+   - 检查数据库服务器是否可访问
+   - 验证数据库用户名和密码是否正确
+   - 确认数据库名称是否存在
 
-2. Redis连接失败
-   - 检查Redis服务是否运行
-   - 验证Redis连接信息是否正确
+2. 初始化失败
+   - 检查数据库用户是否有创建表的权限
+   - 查看错误日志获取详细信息
 
-3. 前端构建失败
-   - 检查Node.js版本是否符合要求
-   - 清除node_modules后重新安装依赖
+3. 服务启动失败
+   - 检查端口是否被占用
+   - 确认所有依赖是否正确安装
+   - 查看服务日志获取错误信息
 
 ## 技术支持
 如有问题，请联系系统管理员或提交Issue。 
