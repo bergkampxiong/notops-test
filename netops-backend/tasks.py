@@ -4,6 +4,7 @@ import os
 import json
 import logging
 from datetime import datetime
+from database.config import get_redis_url
 
 # 配置日志
 logging.basicConfig(
@@ -15,8 +16,8 @@ logger = logging.getLogger(__name__)
 # 创建Celery实例
 celery_app = Celery(
     'netops_tasks',
-    broker='redis://172.23.142.197:6379/1',
-    backend='redis://172.23.142.197:6379/2'
+    broker=get_redis_url(1),
+    backend=get_redis_url(2)
 )
 
 # 任务配置

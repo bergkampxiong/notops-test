@@ -1,112 +1,172 @@
 # NetOps 网络自动化平台
 
-NetOps 是一个现代化的网络自动化平台，旨在简化网络设备管理、配置自动化、监控和故障排除过程。该平台采用前后端分离架构，提供直观的用户界面和强大的API接口。
+NetOps是一个现代化的网络自动化平台，提供网络设备管理、配置管理、任务调度等功能。本平台采用前后端分离架构，后端使用FastAPI框架，前端使用React框架。
 
 ## 功能特点
 
-- **设备管理**：集中管理网络设备，包括交换机、路由器、防火墙等
-- **配置自动化**：通过模板系统自动生成和部署配置
-- **变更管理**：记录和跟踪所有配置变更，支持版本回滚
-- **批量操作**：同时对多个设备执行命令或配置修改
-- **安全策略管理**：集中管理和部署安全策略
-- **定时任务**：计划执行自动化任务
-- **API集成**：提供RESTful API实现与其他系统集成
-- **用户权限管理**：基于角色的访问控制
+- 🔐 用户认证与权限管理
+- 📱 响应式Web界面
+- 🔄 网络设备配置管理
+- ⏰ 定时任务调度
+- 📊 网络拓扑可视化
+- 📝 操作日志记录
+- 🔍 设备搜索与过滤
+- 📦 配置备份与恢复
 
-## 系统架构
+## 技术栈
 
-- **前端**：基于React的现代化Web应用
-- **后端**：基于FastAPI的高性能API服务
-- **数据库**：支持SQLite快速部署和PostgreSQL生产环境
-- **任务队列**：异步任务处理系统
-- **配置系统**：基于Jinja2的模板引擎
+### 后端
+- FastAPI - 高性能Web框架
+- SQLAlchemy - ORM数据库操作
+- Celery - 异步任务队列
+- PostgreSQL - 主数据库
+- Redis - 缓存与消息队列
+
+### 前端
+- React - 用户界面框架
+- Ant Design - UI组件库
+- TypeScript - 类型安全
+- Vite - 构建工具
+
+## 快速开始
+
+### 环境要求
+- Python 3.9+
+- Node.js v22.14.0+
+- PostgreSQL 13+
+- Redis 6+
+
+### 安装步骤
+
+1. 克隆代码库
+```bash
+git clone <repository_url>
+cd netops
+```
+
+2. 安装后端
+```bash
+cd netops-backend
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# 或
+venv\Scripts\activate     # Windows
+pip install -r requirements.txt
+```
+
+3. 安装前端
+```bash
+cd netops-frontend
+npm install
+```
+
+4. 启动服务
+```bash
+# 后端
+cd netops-backend
+python -m uvicorn main:app --host 0.0.0.0 --port 8000
+
+# 前端
+cd netops-frontend
+npm start
+```
 
 ## 项目结构
 
 ```
 netops/
-├── netops-backend/    # 后端服务
-└── netops-frontend/   # 前端应用
+├── netops-backend/          # 后端服务
+│   ├── database/           # 数据库相关
+│   ├── api/               # API路由
+│   ├── models/            # 数据模型
+│   ├── schemas/           # 数据验证
+│   ├── services/          # 业务逻辑
+│   └── utils/             # 工具函数
+└── netops-frontend/        # 前端应用
+    ├── src/               # 源代码
+    ├── public/            # 静态资源
+    └── package.json       # 依赖配置
 ```
 
-## 快速开始
+## 配置说明
 
-### 安装要求
+### 数据库配置
+在 `netops-backend/database/config.py` 中配置数据库连接信息：
+```python
+DATABASE_CONFIG = {
+    "host": "172.18.40.80",
+    "port": 5432,
+    "database": "netops",
+    "user": "amber",
+    "password": "amberman@2025!",
+}
+```
 
-- Python 3.8+
-- Node.js 16+
-- SQLite3 (开发) / PostgreSQL 13+ (生产)
-
-### 安装步骤
-
-详细的安装步骤请参考 [安装文档](INSTALL.md)
-
-## 基本使用
-
-1. 访问系统
-   - 前端界面：http://localhost:3000
-   - API文档：http://localhost:8000/docs
-
-2. 登录系统
-   - 默认管理员账号：admin
-   - 默认密码：admin
-
-3. 添加设备
-   - 在设备管理页面添加网络设备信息
-   - 支持批量导入设备
-
-4. 创建配置模板
-   - 使用Jinja2语法创建可复用的配置模板
-   - 支持变量、条件和循环
-
-5. 执行自动化任务
-   - 创建自动化工作流
-   - 配置定时任务
+### Redis配置
+在同一文件中配置Redis连接信息：
+```python
+REDIS_CONFIG = {
+    "host": "172.18.40.80",
+    "port": 6379,
+    "db": 0,
+}
+```
 
 ## 开发指南
 
-如果您想为项目贡献代码，请参考 [开发指南](DEVELOPMENT.md)
+### 后端开发
+1. 遵循PEP 8编码规范
+2. 使用Type Hints进行类型注解
+3. 编写单元测试
+4. 使用Black进行代码格式化
 
-## 数据库管理
+### 前端开发
+1. 遵循ESLint规则
+2. 使用TypeScript编写组件
+3. 遵循React最佳实践
+4. 使用Prettier进行代码格式化
 
-平台支持数据库备份和恢复功能：
+## 部署说明
 
-### 备份数据库
-
+### 数据库备份
 ```bash
 python backup_database.py
 ```
 
-### 恢复数据库
-
+### 数据库恢复
 ```bash
-python restore_database.py <备份文件路径>
+python restore_database.py /app/net-soc-ops/netops-backend/database_backups/netops_backup_20250402_191054.sql
 ```
 
-## 版本历史
+## 常见问题
 
-- **v1.0.0** (2025-04-01)
-  - 初始版本发布
-  - 基本设备管理功能
-  - 配置模板系统
-  - 用户权限管理
+1. 数据库连接失败
+   - 检查数据库服务状态
+   - 验证连接信息
+   - 确认用户权限
+
+2. Redis连接失败
+   - 检查Redis服务状态
+   - 验证连接信息
+
+3. 前端构建失败
+   - 检查Node.js版本
+   - 清理依赖重新安装
 
 ## 贡献指南
 
-欢迎贡献代码、报告问题或提出改进建议。请参考 [贡献指南](CONTRIBUTING.md)
+1. Fork 项目
+2. 创建特性分支
+3. 提交更改
+4. 推送到分支
+5. 创建Pull Request
 
 ## 许可证
 
-本项目采用 [MIT 许可证](LICENSE)
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
 ## 联系方式
 
-- 项目负责人：网络自动化团队
-- 邮箱：support@netops.example.com
-
-## 相关文档
-
-- [安装文档](INSTALL.md)
-- [API文档](API.md)
-- [用户手册](USER_GUIDE.md)
-- [常见问题](FAQ.md) 
+- 项目维护者：[维护者姓名]
+- 邮箱：[邮箱地址]
+- 问题反馈：[Issues](https://github.com/your-repo/issues) 

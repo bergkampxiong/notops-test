@@ -1,12 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import os
-
-# 数据库连接配置
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./netops.db")
+from .config import get_database_url
 
 # 创建数据库引擎
-engine = create_engine(DATABASE_URL)
+engine = create_engine(get_database_url())
 
 # 创建会话工厂
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

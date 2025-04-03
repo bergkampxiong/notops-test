@@ -12,10 +12,18 @@ def restore_database(backup_file):
         # 连接到数据库（如果不存在会自动创建）
         conn = sqlite3.connect('netops.db')
         
-        # 读取备份文件
+        # 读取备份文件并过滤掉 sqlite_sequence 相关的所有操作
         with open(backup_file, 'r', encoding='utf-8') as f:
-            # 执行SQL语句
-            conn.executescript(f.read())
+            content = f.read()
+            # 过滤掉所有与 sqlite_sequence 相关的语句
+            filtered_lines = []
+            for line in content.split('\n'):
+                if 'sqlite_sequence' not in line:
+                    filtered_lines.append(line)
+            filtered_content = '\n'.join(filtered_lines)
+        
+        # 执行SQL语句
+        conn.executescript(filtered_content)
         
         # 提交更改
         conn.commit()
