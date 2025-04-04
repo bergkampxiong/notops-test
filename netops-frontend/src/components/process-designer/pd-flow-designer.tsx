@@ -54,6 +54,7 @@ import { PDConfigDeployNode } from './nodes/pd-config-deploy-node';
 import { PDCommandExecuteNode } from './nodes/pd-command-execute-node';
 import { PDConfigBackupNode } from './nodes/pd-config-backup-node';
 import { PDStatusCheckNode } from './nodes/pd-status-check-node';
+import { PDDeviceConnectPanel } from './panels/pd-device-connect-panel';
 
 // 节点类型映射
 const nodeTypes = {
@@ -145,6 +146,8 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
   const reactFlowInstance = useReactFlow();
   const [isDirty, setIsDirty] = useState(false);
   const previousProcessId = useRef(processId);
+  const [showDeviceConnectPanel, setShowDeviceConnectPanel] = useState(false);
+  const [selectedDeviceNode, setSelectedDeviceNode] = useState<Node | null>(null);
 
   // 处理键盘删除事件
   const onKeyDown = useCallback((event: KeyboardEvent) => {
@@ -230,6 +233,10 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
   );
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    if (node.type === 'deviceConnect') {
+      setSelectedDeviceNode(node);
+      setShowDeviceConnectPanel(true);
+    }
     setSelectedNode(node);
   }, []);
 
@@ -254,7 +261,7 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
         return;
       }
 
-      const position = reactFlowInstance.screenToFlowPosition({
+      const position = reactFlowInstance.project({
         x: event.clientX - reactFlowBounds.left,
         y: event.clientY - reactFlowBounds.top
       });
@@ -273,8 +280,10 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
       };
 
       setNodes((nds) => nds.concat(newNode));
+      setIsDirty(true);
+      onDirtyChange?.(true);
     },
-    [reactFlowInstance]
+    [reactFlowInstance, setNodes, onDirtyChange]
   );
 
   // 保存流程
@@ -297,6 +306,26 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
   const handleExecute = () => {
     message.success('开始执行');
   };
+
+  // 处理设备连接配置保存
+  const handleDeviceConnectSave = useCallback((data: any) => {
+    if (selectedDeviceNode) {
+      const updatedNode = {
+        ...selectedDeviceNode,
+        data: {
+          ...selectedDeviceNode.data,
+          ...data
+        }
+      };
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === selectedDeviceNode.id ? updatedNode : node
+        )
+      );
+      setIsDirty(true);
+      onDirtyChange?.(true);
+    }
+  }, [selectedDeviceNode, setNodes, onDirtyChange]);
 
   // 加载流程数据
   useEffect(() => {
@@ -426,6 +455,13 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
           </ReactFlow>
         </div>
       </div>
+
+      <PDDeviceConnectPanel
+        visible={showDeviceConnectPanel}
+        onClose={() => setShowDeviceConnectPanel(false)}
+        initialData={selectedDeviceNode?.data}
+        onSave={handleDeviceConnectSave}
+      />
     </div>
   );
 };

@@ -404,4 +404,72 @@
   from {
     stroke-dashoffset: 10;
   }
+}
+
+.pd-device-connect-node {
+  width: 120px;
+  padding: 6px 8px;
+  background: #fff;
+  border: 1px solid #e6f7ff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.pd-device-connect-node:hover {
+  border-color: #91d5ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.pd-device-connect-node.selected {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.pd-device-connect-node .node-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pd-device-connect-node .node-content .anticon {
+  font-size: 14px;
+  color: #1890ff;
+}
+
+.pd-device-connect-node .node-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: normal;
+  color: rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pd-device-connect-node .ant-form {
+  margin-top: 8px;
+}
+
+.pd-device-connect-node .ant-form-item {
+  margin-bottom: 8px;
+}
+
+.pd-device-connect-node .ant-form-item-label {
+  padding: 0;
+}
+
+.pd-device-connect-node .ant-form-item-label > label {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  height: 20px;
+}
+
+.pd-device-connect-node .ant-select {
+  font-size: 12px;
+}
+
+.pd-device-connect-node .ant-select-selection-item {
+  line-height: 20px;
 } 
