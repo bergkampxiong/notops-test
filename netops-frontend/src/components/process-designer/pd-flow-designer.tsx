@@ -130,8 +130,12 @@ const initialNodes = [
   }
 ];
 
-// 内部组件
-const FlowDesigner: React.FC = () => {
+interface PDFlowDesignerProps {
+  processId: string | null;
+  onDirtyChange?: (isDirty: boolean) => void;
+}
+
+const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -139,6 +143,8 @@ const FlowDesigner: React.FC = () => {
   const navigate = useNavigate();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const reactFlowInstance = useReactFlow();
+  const [isDirty, setIsDirty] = useState(false);
+  const previousProcessId = useRef(processId);
 
   // 处理键盘删除事件
   const onKeyDown = useCallback((event: KeyboardEvent) => {
@@ -156,7 +162,20 @@ const FlowDesigner: React.FC = () => {
     };
   }, [onKeyDown]);
 
-  const onConnect = useCallback(
+  // 处理流程数据变化
+  const handleNodesChange = (changes: NodeChange[]) => {
+    onNodesChange(changes);
+    setIsDirty(true);
+    onDirtyChange?.(true);
+  };
+
+  const handleEdgesChange = (changes: EdgeChange[]) => {
+    onEdgesChange(changes);
+    setIsDirty(true);
+    onDirtyChange?.(true);
+  };
+
+  const handleConnect = useCallback(
     (params: Connection) => {
       // 验证连线
       const sourceNode = nodes.find(node => node.id === params.source);
@@ -200,9 +219,14 @@ const FlowDesigner: React.FC = () => {
         }
       };
 
-      setEdges((eds) => addEdge(edge, eds));
+      setEdges((eds) => {
+        const newEdges = addEdge(edge, eds);
+        setIsDirty(true);
+        onDirtyChange?.(true);
+        return newEdges;
+      });
     },
-    [nodes, edges, setEdges]
+    [nodes, edges, setEdges, onDirtyChange]
   );
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
@@ -253,11 +277,16 @@ const FlowDesigner: React.FC = () => {
     [reactFlowInstance]
   );
 
-  const handleSave = () => {
-    if (reactFlowInstance) {
-      const flow = reactFlowInstance.toObject();
-      console.log('保存流程:', flow);
+  // 保存流程
+  const handleSave = async () => {
+    try {
+      // TODO: 替换为实际的API调用
+      // await saveProcess(processId, { nodes, edges });
+      setIsDirty(false);
+      onDirtyChange?.(false);
       message.success('保存成功');
+    } catch (error) {
+      message.error('保存失败');
     }
   };
 
@@ -269,6 +298,34 @@ const FlowDesigner: React.FC = () => {
     message.success('开始执行');
   };
 
+  // 加载流程数据
+  useEffect(() => {
+    if (processId && processId !== previousProcessId.current) {
+      // TODO: 替换为实际的API调用
+      // 模拟加载流程数据
+      setNodes(initialNodes);
+      setEdges([]);
+      setIsDirty(false);
+      onDirtyChange?.(false);
+      previousProcessId.current = processId;
+    }
+  }, [processId, setNodes, setEdges, onDirtyChange]);
+
+  // 监听页面刷新或关闭
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
   return (
     <div className="pd-flow-designer">
       <div className="pd-toolbar">
@@ -277,8 +334,27 @@ const FlowDesigner: React.FC = () => {
             返回
           </Button>
           <Divider type="vertical" />
-          <Button icon={<SaveOutlined />} onClick={handleSave}>
+          <Button
+            type="primary"
+            onClick={handleSave}
+            disabled={!isDirty}
+          >
             保存
+          </Button>
+          <Button
+            onClick={() => {
+              if (processId) {
+                // TODO: 替换为实际的API调用
+                // 重新加载流程数据
+                setNodes(initialNodes);
+                setEdges([]);
+                setIsDirty(false);
+                onDirtyChange?.(false);
+              }
+            }}
+            disabled={!isDirty}
+          >
+            重置
           </Button>
           <Button icon={<CheckOutlined />} onClick={handleValidate}>
             验证
@@ -310,9 +386,9 @@ const FlowDesigner: React.FC = () => {
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            onConnect={handleConnect}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             onDrop={onDrop}
@@ -355,12 +431,14 @@ const FlowDesigner: React.FC = () => {
 };
 
 // 导出包装后的组件
-export const PDFlowDesigner: React.FC = () => {
+const PDFlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange }) => {
   return (
     <div style={{ width: '100%', height: '100%' }}>
       <ReactFlowProvider>
-        <FlowDesigner />
+        <FlowDesigner processId={processId} onDirtyChange={onDirtyChange} />
       </ReactFlowProvider>
     </div>
   );
-}; 
+};
+
+export default PDFlowDesigner; 
