@@ -61,10 +61,13 @@ export const getFullCredential = async (id: number): Promise<FullCredential> => 
  */
 export const getCredentials = async (): Promise<Credential[]> => {
   try {
+    console.log('正在获取凭证列表...');
     const response = await api.get('/api/device/credential');
+    console.log('凭证列表获取成功:', response.data);
     return response.data;
   } catch (error) {
     console.error('获取凭证列表失败:', error);
-    throw error;
+    // 返回空数组而不是抛出错误
+    return [];
   }
 }; 

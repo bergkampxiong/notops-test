@@ -114,18 +114,31 @@ export const logout = async (): Promise<void> => {
 export const checkAuth = async (): Promise<boolean> => {
   try {
     const token = localStorage.getItem('token');
-    console.log('Checking auth, token exists:', !!token);
+    console.log('检查认证状态，token存在:', !!token);
+    
     if (!token) {
+      console.log('未找到token，用户未认证');
       return false;
     }
     
     // 调用后端API验证token
-    console.log('Verifying token with backend...');
+    console.log('正在验证token...');
     const response = await api.get('/auth/verify');
-    console.log('Token verification response:', response.status, response.data);
-    return response.status === 200;
+    console.log('Token验证响应:', response.status, response.data);
+    
+    if (response.status === 200) {
+      // 更新用户信息
+      const { username, role } = response.data;
+      localStorage.setItem('username', username);
+      localStorage.setItem('userRole', role);
+      console.log('用户已认证:', username, role);
+      return true;
+    }
+    
+    console.log('Token验证失败，状态码:', response.status);
+    return false;
   } catch (error) {
-    console.error('Token verification failed:', error);
+    console.error('Token验证失败:', error);
     return false;
   }
 };

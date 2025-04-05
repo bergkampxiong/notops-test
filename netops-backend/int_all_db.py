@@ -17,6 +17,11 @@ from database.cmdb_models import (
     Asset, NetworkDevice, Server, VirtualMachine, K8sCluster,
     InventoryTask, InventoryItem, K8sNode, K8sPod, NetworkInterface, SystemType
 )
+from database.init_all_db import (
+    Base as NetOpsBase, 
+    RpaDeviceConnection, RpaConnectionLog, RpaCommandLog,
+    RpaConnectionPool, RpaPoolStats, RpaPoolMetrics
+)
 
 # 创建密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -249,6 +254,92 @@ def init_cmdb_db():
         traceback.print_exc()
         return False
 
+def init_rpa_db():
+    """初始化RPA功能相关数据库表"""
+    try:
+        # 创建表
+        tables = [
+            RpaDeviceConnection.__table__, 
+            RpaConnectionLog.__table__, 
+            RpaCommandLog.__table__,
+            RpaConnectionPool.__table__, 
+            RpaPoolStats.__table__, 
+            RpaPoolMetrics.__table__
+        ]
+        
+        # 创建表
+        NetOpsBase.metadata.create_all(bind=main_engine, tables=tables)
+        print("RPA功能数据库表已创建")
+        
+        # 创建会话
+        db = SessionLocal()
+        
+        try:
+            # 初始化示例连接池
+            sample_pools = [
+                {
+                    "name": "默认连接池",
+                    "max_connections": 50,
+                    "min_connections": 5,
+                    "connection_timeout": 30,
+                    "idle_timeout": 300,
+                    "max_lifetime": 3600,
+                    "description": "系统默认连接池"
+                },
+                {
+                    "name": "高性能连接池",
+                    "max_connections": 100,
+                    "min_connections": 10,
+                    "connection_timeout": 20,
+                    "idle_timeout": 600,
+                    "max_lifetime": 7200,
+                    "description": "用于高性能设备连接"
+                }
+            ]
+            
+            # 添加示例连接池
+            for pool_data in sample_pools:
+                # 检查是否已存在
+                existing = db.query(RpaConnectionPool).filter(
+                    RpaConnectionPool.name == pool_data["name"]
+                ).first()
+                
+                if not existing:
+                    pool = RpaConnectionPool(
+                        name=pool_data["name"],
+                        max_connections=pool_data["max_connections"],
+                        min_connections=pool_data["min_connections"],
+                        connection_timeout=pool_data["connection_timeout"],
+                        idle_timeout=pool_data["idle_timeout"],
+                        max_lifetime=pool_data["max_lifetime"],
+                        description=pool_data["description"],
+                        status="active",
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow()
+                    )
+                    db.add(pool)
+            
+            # 提交事务
+            db.commit()
+            print("RPA连接池初始化成功")
+            return True
+            
+        except Exception as e:
+            db.rollback()
+            print(f"RPA连接池初始化失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
+            
+        finally:
+            db.close()
+            
+    except Exception as e:
+        print(f"初始化RPA数据库失败: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     """主函数"""
     print("=== 开始数据库初始化过程 ===")
@@ -270,10 +361,19 @@ def main():
         print("CMDB数据库初始化成功")
     else:
         print("CMDB数据库初始化失败")
+        
+    # 初始化RPA功能数据库
+    print("\n3. 初始化RPA功能数据库")
+    rpa_db_success = init_rpa_db()
+    
+    if rpa_db_success:
+        print("RPA功能数据库初始化成功")
+    else:
+        print("RPA功能数据库初始化失败")
     
     # 总结
     print("\n=== 数据库初始化过程完成 ===")
-    if main_db_success and cmdb_db_success:
+    if main_db_success and cmdb_db_success and rpa_db_success:
         print("所有数据库初始化成功！")
         print("\n登录信息:")
         print("  用户名: admin")

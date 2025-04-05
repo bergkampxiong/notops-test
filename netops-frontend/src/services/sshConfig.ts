@@ -70,14 +70,13 @@ const deviceTypes = [
  */
 export const getSSHConfigs = async (): Promise<SSHConfig[]> => {
   try {
-    // 从本地存储获取配置
-    const configs = localStorage.getItem('ssh_configs');
-    if (configs) {
-      return JSON.parse(configs);
-    }
-    return [];
+    console.log('正在获取SSH配置列表...');
+    const response = await api.get('/api/device/connections');
+    console.log('SSH配置列表获取成功:', response.data);
+    return response.data;
   } catch (error) {
     console.error('获取SSH配置失败:', error);
+    // 返回空数组而不是抛出错误
     return [];
   }
 };
@@ -89,31 +88,8 @@ export const getSSHConfigs = async (): Promise<SSHConfig[]> => {
  */
 export const createSSHConfig = async (data: SSHConfigCreate): Promise<SSHConfig> => {
   try {
-    // 获取现有配置
-    const configs = await getSSHConfigs();
-    
-    // 创建新配置
-    const newConfig: SSHConfig = {
-      ...data,
-      // 为可选的Netmiko参数提供默认值
-      global_delay_factor: data.global_delay_factor || 1,
-      auth_timeout: data.auth_timeout || 20,
-      banner_timeout: data.banner_timeout || 20,
-      fast_cli: data.fast_cli || false,
-      session_timeout: data.session_timeout || 60,
-      conn_timeout: data.conn_timeout || 10,
-      keepalive: data.keepalive || 10,
-      verbose: data.verbose || false,
-      id: Date.now(),
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    // 保存到本地存储
-    configs.push(newConfig);
-    localStorage.setItem('ssh_configs', JSON.stringify(configs));
-    
-    return newConfig;
+    const response = await api.post('/api/device/connections', data);
+    return response.data;
   } catch (error) {
     console.error('创建SSH配置失败:', error);
     throw error;
@@ -128,24 +104,8 @@ export const createSSHConfig = async (data: SSHConfigCreate): Promise<SSHConfig>
  */
 export const updateSSHConfig = async (id: number, data: Partial<SSHConfigCreate>): Promise<SSHConfig> => {
   try {
-    const configs = await getSSHConfigs();
-    const index = configs.findIndex(config => config.id === id);
-    
-    if (index === -1) {
-      throw new Error('SSH配置不存在');
-    }
-
-    // 更新配置
-    configs[index] = {
-      ...configs[index],
-      ...data,
-      updated_at: new Date().toISOString()
-    };
-
-    // 保存到本地存储
-    localStorage.setItem('ssh_configs', JSON.stringify(configs));
-    
-    return configs[index];
+    const response = await api.put(`/api/device/connections/${id}`, data);
+    return response.data;
   } catch (error) {
     console.error('更新SSH配置失败:', error);
     throw error;
@@ -158,11 +118,7 @@ export const updateSSHConfig = async (id: number, data: Partial<SSHConfigCreate>
  */
 export const deleteSSHConfig = async (id: number): Promise<void> => {
   try {
-    const configs = await getSSHConfigs();
-    const filteredConfigs = configs.filter(config => config.id !== id);
-    
-    // 保存到本地存储
-    localStorage.setItem('ssh_configs', JSON.stringify(filteredConfigs));
+    await api.delete(`/api/device/connections/${id}`);
   } catch (error) {
     console.error('删除SSH配置失败:', error);
     throw error;
@@ -180,21 +136,27 @@ export const getSSHPoolStatus = async (configId: number): Promise<{
   waiting_connections: number;   // 等待连接数
   connection_errors: number;     // 连接错误数
 }> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return {
-    active_connections: Math.floor(Math.random() * 10),
-    idle_connections: Math.floor(Math.random() * 5),
-    waiting_connections: Math.floor(Math.random() * 3),
-    connection_errors: Math.floor(Math.random() * 2)
-  };
+  try {
+    const response = await api.get(`/api/device/connections/pools/${configId}/status`);
+    return response.data;
+  } catch (error) {
+    console.error('获取连接池状态失败:', error);
+    throw error;
+  }
 };
 
 /**
  * 清理SSH连接池
  * @param configId SSH配置ID
+ * @returns Promise<void>
  */
 export const cleanupSSHPool = async (configId: number): Promise<void> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    await api.post(`/api/device/connections/pools/${configId}/cleanup`);
+  } catch (error) {
+    console.error('清理连接池失败:', error);
+    throw error;
+  }
 };
 
 /**
@@ -208,13 +170,13 @@ export const getSSHPoolConfig = async (configId: number): Promise<{
   idle_timeout: number;         // 空闲超时时间
   max_lifetime: number;         // 最大生命周期
 }> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return {
-    max_connections: 100,
-    connection_timeout: 30,
-    idle_timeout: 300,
-    max_lifetime: 3600
-  };
+  try {
+    const response = await api.get(`/api/device/connections/pools/${configId}`);
+    return response.data;
+  } catch (error) {
+    console.error('获取连接池配置失败:', error);
+    throw error;
+  }
 };
 
 /**
@@ -231,7 +193,12 @@ export const updateSSHPoolConfig = async (
     max_lifetime?: number;
   }
 ): Promise<void> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    await api.put(`/api/device/connections/pools/${configId}`, data);
+  } catch (error) {
+    console.error('更新连接池配置失败:', error);
+    throw error;
+  }
 };
 
 /**

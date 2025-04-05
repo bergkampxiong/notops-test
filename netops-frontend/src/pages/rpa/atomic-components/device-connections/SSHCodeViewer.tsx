@@ -24,7 +24,7 @@ const SSHCodeViewer: React.FC<SSHCodeViewerProps> = ({ visible, onClose, config 
    */
   useEffect(() => {
     const fetchCredential = async () => {
-      if (!config.credential_id) {
+      if (!config || !config.credential_id) {
         message.error('未选择凭证');
         return;
       }
@@ -32,20 +32,29 @@ const SSHCodeViewer: React.FC<SSHCodeViewerProps> = ({ visible, onClose, config 
       try {
         setLoading(true);
         const data = await getFullCredential(config.credential_id);
-        console.log('获取到的凭证信息:', data);
         setCredential(data);
       } catch (error) {
-        message.error('获取凭证信息失败');
+        // 处理错误信息时确保只显示字符串
+        let errorMessage = '获取凭证信息失败';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        } else if (error && typeof error === 'object') {
+          errorMessage = JSON.stringify(error);
+        }
+        
+        message.error(errorMessage);
         console.error('获取凭证信息失败:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    if (visible) {
+    if (visible && config) {
       fetchCredential();
     }
-  }, [visible, config.credential_id]);
+  }, [visible, config]);
 
   /**
    * 生成Netmiko连接代码

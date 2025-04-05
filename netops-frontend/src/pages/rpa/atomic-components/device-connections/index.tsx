@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, message, Popconfirm } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Space, message, Popconfirm, Tabs } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CodeOutlined } from '@ant-design/icons';
 import SSHConfigModal from './SSHConfigModal';
+import PoolMonitor from './PoolMonitor';
+import SSHCodeViewer from './SSHCodeViewer';
 import { getSSHConfigs, deleteSSHConfig, SSHConfig } from '../../../../services/sshConfig';
+
+const { TabPane } = Tabs;
 
 const DeviceConnections: React.FC = () => {
   const [sshConfigs, setSSHConfigs] = useState<SSHConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingConfig, setEditingConfig] = useState<SSHConfig | undefined>();
+  const [codeViewerVisible, setCodeViewerVisible] = useState(false);
+  const [selectedConfig, setSelectedConfig] = useState<SSHConfig | undefined>();
 
   const fetchSSHConfigs = async () => {
     setLoading(true);
@@ -17,6 +23,7 @@ const DeviceConnections: React.FC = () => {
       setSSHConfigs(data);
     } catch (error) {
       message.error('获取SSH配置列表失败');
+      console.error('获取SSH配置列表失败:', error);
     } finally {
       setLoading(false);
     }
@@ -43,7 +50,13 @@ const DeviceConnections: React.FC = () => {
       fetchSSHConfigs();
     } catch (error) {
       message.error('删除SSH配置失败');
+      console.error('删除SSH配置失败:', error);
     }
+  };
+
+  const handleViewCode = (record: SSHConfig) => {
+    setSelectedConfig(record);
+    setCodeViewerVisible(true);
   };
 
   const columns = [
@@ -79,6 +92,13 @@ const DeviceConnections: React.FC = () => {
           >
             编辑
           </Button>
+          <Button
+            type="link"
+            icon={<CodeOutlined />}
+            onClick={() => handleViewCode(record)}
+          >
+            查看代码
+          </Button>
           <Popconfirm
             title="确定要删除这个SSH配置吗？"
             onConfirm={() => handleDelete(record.id)}
@@ -95,35 +115,50 @@ const DeviceConnections: React.FC = () => {
   ];
 
   return (
-    <Card
-      title="SSH连接配置"
-      extra={
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleAdd}
+    <Tabs defaultActiveKey="1">
+      <TabPane tab="SSH连接配置" key="1">
+        <Card
+          title="SSH连接配置"
+          extra={
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAdd}
+            >
+              新增SSH配置
+            </Button>
+          }
         >
-          新增SSH配置
-        </Button>
-      }
-    >
-      <Table
-        columns={columns}
-        dataSource={sshConfigs}
-        rowKey="id"
-        loading={loading}
-      />
+          <Table
+            columns={columns}
+            dataSource={sshConfigs}
+            rowKey="id"
+            loading={loading}
+          />
 
-      <SSHConfigModal
-        visible={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        onSuccess={() => {
-          setModalVisible(false);
-          fetchSSHConfigs();
-        }}
-        initialValues={editingConfig}
-      />
-    </Card>
+          <SSHConfigModal
+            visible={modalVisible}
+            onCancel={() => setModalVisible(false)}
+            onSuccess={() => {
+              setModalVisible(false);
+              fetchSSHConfigs();
+            }}
+            initialValues={editingConfig}
+          />
+
+          {selectedConfig && (
+            <SSHCodeViewer
+              visible={codeViewerVisible}
+              onClose={() => setCodeViewerVisible(false)}
+              config={selectedConfig}
+            />
+          )}
+        </Card>
+      </TabPane>
+      <TabPane tab="连接池监控" key="2">
+        <PoolMonitor />
+      </TabPane>
+    </Tabs>
   );
 };
 

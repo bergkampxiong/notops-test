@@ -228,9 +228,25 @@ const Setup2FA: React.FC = () => {
             // 如果detail是数组，打印每个错误
             error.response.data.detail.forEach((item: any, index: number) => {
               console.error(`错误 ${index + 1}:`, item);
-              message.error(`设置TOTP失败: ${item.msg || JSON.stringify(item)}`);
+              
+              // 确保只渲染字符串，而不是直接渲染对象
+              let errorMsg = '';
+              if (typeof item === 'string') {
+                errorMsg = item;
+              } else if (item && typeof item === 'object') {
+                // 优先使用msg字段，如果存在
+                errorMsg = item.msg || JSON.stringify(item);
+              } else {
+                errorMsg = String(item);
+              }
+              
+              message.error(`设置TOTP失败: ${errorMsg}`);
             });
+          } else if (typeof error.response.data.detail === 'object') {
+            // 如果detail是对象，转换为字符串
+            message.error(`设置TOTP失败: ${JSON.stringify(error.response.data.detail)}`);
           } else {
+            // 如果detail是字符串，直接使用
             message.error(`设置TOTP失败: ${error.response.data.detail}`);
           }
         } else {

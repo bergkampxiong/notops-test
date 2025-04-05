@@ -23,6 +23,7 @@ const PoolMonitor: React.FC = () => {
       setMetrics(metricsData);
     } catch (error) {
       message.error('获取监控数据失败');
+      console.error('获取监控数据失败:', error);
     } finally {
       setLoading(false);
     }
@@ -41,6 +42,7 @@ const PoolMonitor: React.FC = () => {
       fetchData();
     } catch (error) {
       message.error('清理异常连接失败');
+      console.error('清理异常连接失败:', error);
     }
   };
 
@@ -136,7 +138,7 @@ const PoolMonitor: React.FC = () => {
               <Col span={8}>
                 <Statistic
                   title="资源使用率"
-                  value={stats?.resource_usage.cpu}
+                  value={stats?.resource_usage?.cpu}
                   suffix="%"
                   loading={loading}
                 />
