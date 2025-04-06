@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, message, Typography, Steps, Spin } from 'antd';
 import { UserOutlined, LockOutlined, SafetyOutlined, QrcodeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
-import api from '../services/auth';
+import request from '../utils/request';
 
 const { Title, Paragraph, Text } = Typography;
 const { Step } = Steps;
@@ -46,7 +46,7 @@ const Setup2FA: React.FC = () => {
           try {
             // 验证token是否有效
             console.log('Verifying token...');
-            const response = await api.get('/auth/verify');
+            const response = await request.get('/api/auth/verify');
             
             if (response.status === 200) {
               console.log('Token verified successfully');
@@ -86,7 +86,7 @@ const Setup2FA: React.FC = () => {
         password: '******' // 隐藏密码
       });
       
-      const loginResponse = await api.post('/auth/login', formData, {
+      const loginResponse = await request.post('/api/auth/login', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
@@ -136,34 +136,9 @@ const Setup2FA: React.FC = () => {
       } else {
         message.error('用户名或密码错误');
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('登录失败:', error);
-      
-      // 打印更详细的错误信息
-      if (error.response) {
-        // 服务器响应了，但状态码不在2xx范围内
-        console.error('错误响应数据:', error.response.data);
-        console.error('错误状态码:', error.response.status);
-        
-        if (error.response.status === 401) {
-          message.error('用户名或密码错误');
-        } else if (error.response.status === 500) {
-          message.error('服务器内部错误，请联系管理员');
-          console.error('服务器内部错误详情:', error.response.data);
-        } else if (error.response.data && error.response.data.detail) {
-          message.error(`登录失败: ${error.response.data.detail}`);
-        } else {
-          message.error(`登录失败: 服务器返回 ${error.response.status} 错误`);
-        }
-      } else if (error.request) {
-        // 请求已发送但没有收到响应
-        console.error('未收到响应:', error.request);
-        message.error('登录失败: 未收到服务器响应');
-      } else {
-        // 设置请求时发生错误
-        console.error('请求错误:', error.message);
-        message.error(`登录失败: ${error.message}`);
-      }
+      message.error('登录失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -182,15 +157,15 @@ const Setup2FA: React.FC = () => {
       // 根据用户是否已登录选择不同的API端点
       if (isLoggedIn && token) {
         // 已登录用户使用/auth/totp-setup端点
-        console.log('Using /auth/totp-setup endpoint for logged in user');
-        response = await api.post('/auth/totp-setup', {}, {
+        console.log('Using /api/auth/totp-setup endpoint for logged in user');
+        response = await request.post('/api/auth/totp-setup', {}, {
           headers: {
             'Content-Type': 'application/json'
           }
         });
       } else {
         // 未登录用户或首次设置2FA的用户使用/auth/totp-setup-for-user端点
-        console.log('Using /auth/totp-setup-for-user endpoint for user:', user);
+        console.log('Using /api/auth/totp-setup-for-user endpoint for user:', user);
         
         // 使用URLSearchParams格式发送请求
         const formData = new URLSearchParams();
@@ -198,7 +173,7 @@ const Setup2FA: React.FC = () => {
         
         console.log('Sending request with form data:', formData.toString());
         
-        response = await api.post('/auth/totp-setup-for-user', formData, {
+        response = await request.post('/api/auth/totp-setup-for-user', formData, {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -208,59 +183,9 @@ const Setup2FA: React.FC = () => {
       console.log('TOTP setup response:', response.data);
       setTotpData(response.data);
       setCurrentStep(1); // 移动到扫描二维码步骤
-    } catch (error: any) {
+    } catch (error) {
       console.error('设置TOTP失败:', error);
-      // 打印更详细的错误信息
-      if (error.response) {
-        // 服务器响应了，但状态码不在2xx范围内
-        console.error('错误响应数据:', error.response.data);
-        console.error('错误状态码:', error.response.status);
-        console.error('错误响应头:', error.response.headers);
-        
-        if (error.response.status === 401) {
-          message.error('认证失败，请重新登录');
-          setIsLoggedIn(false);
-          localStorage.removeItem('token');
-          localStorage.removeItem('username');
-          setCurrentStep(0);
-        } else if (error.response.data && error.response.data.detail) {
-          if (Array.isArray(error.response.data.detail)) {
-            // 如果detail是数组，打印每个错误
-            error.response.data.detail.forEach((item: any, index: number) => {
-              console.error(`错误 ${index + 1}:`, item);
-              
-              // 确保只渲染字符串，而不是直接渲染对象
-              let errorMsg = '';
-              if (typeof item === 'string') {
-                errorMsg = item;
-              } else if (item && typeof item === 'object') {
-                // 优先使用msg字段，如果存在
-                errorMsg = item.msg || JSON.stringify(item);
-              } else {
-                errorMsg = String(item);
-              }
-              
-              message.error(`设置TOTP失败: ${errorMsg}`);
-            });
-          } else if (typeof error.response.data.detail === 'object') {
-            // 如果detail是对象，转换为字符串
-            message.error(`设置TOTP失败: ${JSON.stringify(error.response.data.detail)}`);
-          } else {
-            // 如果detail是字符串，直接使用
-            message.error(`设置TOTP失败: ${error.response.data.detail}`);
-          }
-        } else {
-          message.error(`设置TOTP失败: 服务器返回 ${error.response.status} 错误`);
-        }
-      } else if (error.request) {
-        // 请求已发送但没有收到响应
-        console.error('未收到响应:', error.request);
-        message.error('设置TOTP失败: 未收到服务器响应');
-      } else {
-        // 设置请求时发生错误
-        console.error('请求错误:', error.message);
-        message.error(`设置TOTP失败: ${error.message}`);
-      }
+      message.error('设置双因素认证失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -271,7 +196,7 @@ const Setup2FA: React.FC = () => {
     setLoading(true);
     try {
       console.log('Verifying TOTP for user:', username, 'code:', values.totp_code);
-      const response = await api.post('/auth/totp-verify', {
+      const response = await request.post('/api/auth/totp-verify', {
         totp_code: values.totp_code,
         username: username
       });
@@ -438,7 +363,7 @@ const Setup2FA: React.FC = () => {
           
           <div style={{ textAlign: 'center', margin: '20px 0' }}>
             <img 
-              src={`/api/auth/totp-qrcode?uri=${encodeURIComponent(totpData.uri)}`} 
+              src={`auth/totp-qrcode?uri=${encodeURIComponent(totpData.uri)}`} 
               alt="TOTP QR Code" 
               style={{ maxWidth: '100%', border: '1px solid #f0f0f0', padding: 8 }}
             />

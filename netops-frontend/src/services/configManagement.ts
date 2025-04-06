@@ -1,69 +1,47 @@
 import request from '../utils/request';
-
-export interface ConfigFile {
-  id: string;
-  name: string;
-  template_type: string;
-  content: string;
-  description: string | null;
-  status: string;
-  device_type: string;
-  tags: string[];
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by: string;
-}
-
-export interface Version {
-  version: number;
-  content: string;
-  comment: string;
-  created_at: string;
-  created_by: string;
-}
+import type { ConfigFile, Version } from '../types/config';
 
 export const configManagementService = {
   getConfigs: () => {
-    return request.get<ConfigFile[]>('/api/config/files');
+    return request.get<ConfigFile[]>('config/files');
   },
 
   getConfig: (id: string) => {
-    return request.get<ConfigFile>(`/api/config/files/${id}`);
+    return request.get<ConfigFile>(`config/files/${id}`);
   },
 
   createConfig: (config: Partial<ConfigFile>) => {
-    return request.post<ConfigFile>('/api/config/files', config);
+    return request.post<ConfigFile>('config/files', config);
   },
 
   updateConfig: (id: string, config: Partial<ConfigFile>) => {
-    return request.put<ConfigFile>(`/api/config/files/${id}`, config);
+    return request.put<ConfigFile>(`config/files/${id}`, config);
   },
 
   deleteConfig: (id: string) => {
-    return request.delete(`/api/config/files/${id}`);
+    return request.delete(`config/files/${id}`);
   },
 
   getVersions: (configId: string) => {
-    return request.get<Version[]>(`/api/config/files/${configId}/versions`);
+    return request.get<Version[]>(`config/files/${configId}/versions`);
   },
 
   createVersion: (configId: string, content: string, comment: string) => {
-    return request.post<Version>(`/api/config/files/${configId}/versions`, {
+    return request.post<Version>(`config/files/${configId}/versions`, {
       content,
       comment,
     });
   },
 
   renderTemplate: (templateName: string, variables: Record<string, any>) => {
-    return request.post<{ content: string }>('/api/config/render-template', {
+    return request.post<{ content: string }>('config/render-template', {
       template_name: templateName,
       variables,
     });
   },
 
   parseConfig: (templateName: string, rawText: string) => {
-    return request.post<{ result: any[] }>('/api/config/parse-config', {
+    return request.post<{ result: any[] }>('config/parse-config', {
       template_name: templateName,
       raw_text: rawText,
     });

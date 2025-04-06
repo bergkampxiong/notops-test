@@ -36,7 +36,14 @@ async def get_audit_logs(
         success=success
     )
     
-    return logs
+    # 获取总数
+    total = db.query(AuditLog).count()
+    
+    # 返回标准格式
+    return {
+        "items": logs,
+        "total": total
+    }
 
 @router.get("/event-types")
 @roles_required(["Admin", "Auditor"])

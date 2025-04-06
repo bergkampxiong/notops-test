@@ -1,4 +1,4 @@
-import api from './auth';
+import request from '../utils/request';
 
 /**
  * CMDB服务
@@ -8,7 +8,7 @@ import api from './auth';
 // 数据查询相关API
 export const getDeviceTypes = async (params?: any) => {
   try {
-    const response = await api.get('/cmdb/base/device-types', { params });
+    const response = await request.get('/cmdb/base/device-types', { params });
     return response.data;
   } catch (error) {
     console.error('获取设备类型失败:', error);
@@ -19,7 +19,7 @@ export const getDeviceTypes = async (params?: any) => {
 // 自动发现相关API
 export const getDiscoveryTasks = async (params?: any) => {
   try {
-    const response = await api.get('/cmdb/discovery/tasks', { params });
+    const response = await request.get('/cmdb/discovery/tasks', { params });
     return response.data;
   } catch (error) {
     console.error('获取发现任务失败:', error);
@@ -29,7 +29,7 @@ export const getDiscoveryTasks = async (params?: any) => {
 
 export const createDiscoveryTask = async (data: any) => {
   try {
-    const response = await api.post('/cmdb/discovery/tasks', data);
+    const response = await request.post('/cmdb/discovery/tasks', data);
     return response.data;
   } catch (error) {
     console.error('创建发现任务失败:', error);
@@ -40,7 +40,7 @@ export const createDiscoveryTask = async (data: any) => {
 // 资产盘点相关API
 export const getInventoryTasks = async (params?: any) => {
   try {
-    const response = await api.get('/cmdb/inventory/tasks', { params });
+    const response = await request.get('/cmdb/inventory/tasks', { params });
     return response.data;
   } catch (error) {
     console.error('获取盘点任务失败:', error);
@@ -50,7 +50,7 @@ export const getInventoryTasks = async (params?: any) => {
 
 export const createInventoryTask = async (data: any) => {
   try {
-    const response = await api.post('/cmdb/inventory/tasks', data);
+    const response = await request.post('/cmdb/inventory/tasks', data);
     return response.data;
   } catch (error) {
     console.error('创建盘点任务失败:', error);

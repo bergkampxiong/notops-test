@@ -7,7 +7,7 @@ import {
   PlusOutlined, EditOutlined, DeleteOutlined, 
   ReloadOutlined, DatabaseOutlined 
 } from '@ant-design/icons';
-import axios from 'axios';
+import request from '../../utils/request';
 import './ModelManage.css';
 
 const { TabPane } = Tabs;
@@ -48,7 +48,7 @@ const CMDBModelManage: React.FC = () => {
   const fetchModelData = async (modelType: string) => {
     setLoading(true);
     try {
-      const response = await axios.get(`/api/cmdb/${modelType}`);
+      const response = await request.get(`/api/cmdb/${modelType}`);
       setModelData(response.data);
     } catch (error) {
       console.error(`获取${getModelTypeName(modelType)}数据失败:`, error);
@@ -101,27 +101,51 @@ const CMDBModelManage: React.FC = () => {
       
       if (editingItem) {
         // 更新现有项
-        await axios.put(`/api/cmdb/${activeTab}/${editingItem.id}`, values);
-        message.success(`${getModelTypeName(activeTab)}更新成功`);
+        await handleEdit(values);
       } else {
         // 创建新项
-        await axios.post(`/api/cmdb/${activeTab}`, values);
-        message.success(`${getModelTypeName(activeTab)}添加成功`);
+        await handleAdd(values);
       }
-      
-      setModalVisible(false);
-      fetchModelData(activeTab);
     } catch (error) {
       console.error('表单提交失败:', error);
       message.error('操作失败，请检查输入');
     }
   };
 
+  // 处理编辑
+  const handleEdit = async (values: any) => {
+    if (!editingItem) {
+      message.error('编辑项不存在');
+      return;
+    }
+    
+    try {
+      await request.put(`/api/cmdb/${activeTab}/${editingItem.id}`, values);
+      message.success('更新成功');
+      setEditingItem(null);
+      fetchModelData(activeTab);
+    } catch (error) {
+      message.error('更新失败');
+    }
+  };
+
+  // 处理添加
+  const handleAdd = async (values: any) => {
+    try {
+      await request.post(`/api/cmdb/${activeTab}`, values);
+      message.success('添加成功');
+      setModalVisible(false);
+      fetchModelData(activeTab);
+    } catch (error) {
+      message.error('添加失败');
+    }
+  };
+
   // 处理删除
   const handleDelete = async (id: number) => {
     try {
-      await axios.delete(`/api/cmdb/${activeTab}/${id}`);
-      message.success(`${getModelTypeName(activeTab)}删除成功`);
+      await request.delete(`/api/cmdb/${activeTab}/${id}`);
+      message.success('删除成功');
       fetchModelData(activeTab);
     } catch (error) {
       console.error('删除失败:', error);

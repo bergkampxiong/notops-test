@@ -1,238 +1,300 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, Card, Form, Input, Button, 
-  DatePicker, Select, Space, Tag, Row, Col 
+import {
+  Table,
+  Button,
+  Space,
+  Input,
+  Select,
+  DatePicker,
+  message,
+  Typography,
+  Card,
+  Row,
+  Col,
+  Statistic,
+  Tag,
+  Modal,
+  Tooltip
 } from 'antd';
-import { 
-  SearchOutlined, ReloadOutlined, 
-  CheckCircleOutlined, CloseCircleOutlined 
+import {
+  SearchOutlined,
+  ExportOutlined,
+  EyeOutlined,
+  FileSearchOutlined,
+  UserOutlined,
+  ClockCircleOutlined,
+  SafetyOutlined
 } from '@ant-design/icons';
-import moment from 'moment';
-import api from '../../services/auth';
+import type { Dayjs } from 'dayjs';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import request from '../../utils/request';
 
-const { Option } = Select;
 const { RangePicker } = DatePicker;
+const { Title } = Typography;
+const { Option } = Select;
+
+// 配置 dayjs 使用 UTC 和时区插件
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault('Asia/Shanghai'); // 设置默认时区为 UTC+8
 
 interface AuditLog {
   id: number;
+  username: string;
+  action: string;
+  resource: string;
+  status: string;
+  ip_address: string;
   timestamp: string;
-  user_id: number | null;
-  username: string | null;
-  event_type: string;
-  ip_address: string | null;
-  user_agent: string | null;
-  details: string | null;
-  success: boolean;
-}
-
-interface SearchParams {
-  username?: string;
-  event_type?: string;
-  start_date?: string;
-  end_date?: string;
-  success?: boolean;
+  details: string;
 }
 
 const AuditLogs: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
-  const [eventTypes, setEventTypes] = useState<string[]>([]);
-  const [searchParams, setSearchParams] = useState<SearchParams>({});
-  const [form] = Form.useForm();
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+  const [eventType, setEventType] = useState<string>('');
+  const [searchText, setSearchText] = useState('');
+  const [detailsVisible, setDetailsVisible] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // 获取审计日志
-  const fetchLogs = async (params: SearchParams = {}) => {
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const fetchLogs = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/audit/logs', { params });
-      setLogs(response.data);
+      const params: any = {
+        page: currentPage,
+        pageSize: pageSize,
+        eventType: eventType,
+        searchText: searchText
+      };
+
+      if (dateRange) {
+        params.startTime = dateRange[0].tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
+        params.endTime = dateRange[1].tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
+      }
+
+      const response = await request.get('/api/audit/logs', { params });
+      
+      // 确保response.data存在且包含items和total
+      if (response && response.data) {
+        // 如果返回的是数组，直接使用
+        if (Array.isArray(response.data)) {
+          setLogs(response.data);
+          setTotal(response.data.length);
+        } 
+        // 如果返回的是对象，检查是否有items和total
+        else if (response.data.items) {
+          setLogs(response.data.items);
+          setTotal(response.data.total || response.data.items.length);
+        } 
+        // 如果格式不符合预期，设置为空数组
+        else {
+          setLogs([]);
+          setTotal(0);
+        }
+      } else {
+        setLogs([]);
+        setTotal(0);
+      }
     } catch (error) {
       console.error('获取审计日志失败:', error);
+      message.error('获取审计日志失败');
+      setLogs([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   };
 
-  // 获取事件类型列表
-  const fetchEventTypes = async () => {
-    try {
-      const response = await api.get('/audit/event-types');
-      setEventTypes(response.data);
-    } catch (error) {
-      console.error('获取事件类型列表失败:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchLogs();
-    fetchEventTypes();
-  }, []);
-
-  // 处理搜索
-  const handleSearch = (values: any) => {
-    const params: SearchParams = {};
-    
-    if (values.username) {
-      params.username = values.username;
-    }
-    
-    if (values.event_type) {
-      params.event_type = values.event_type;
-    }
-    
-    if (values.success !== undefined) {
-      params.success = values.success;
-    }
-    
-    if (values.date_range && values.date_range.length === 2) {
-      params.start_date = values.date_range[0].format('YYYY-MM-DDTHH:mm:ss');
-      params.end_date = values.date_range[1].format('YYYY-MM-DDTHH:mm:ss');
-    }
-    
-    setSearchParams(params);
-    fetchLogs(params);
-  };
-
-  // 重置搜索
-  const handleReset = () => {
-    form.resetFields();
-    setSearchParams({});
+  const handleSearch = () => {
     fetchLogs();
   };
 
-  // 表格列定义
+  const handleExport = () => {
+    const params: any = {
+      eventType: eventType,
+      searchText: searchText
+    };
+
+    if (dateRange) {
+      params.startTime = dateRange[0].tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
+      params.endTime = dateRange[1].tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
+    }
+
+    // 构建查询字符串
+    const queryString = Object.entries(params)
+      .filter(([_, value]) => value !== undefined && value !== '')
+      .map(([key, value]) => `${key}=${encodeURIComponent(value as string)}`)
+      .join('&');
+
+    // 创建下载链接
+    const url = `/api/audit/logs/export?${queryString}`;
+    window.open(url, '_blank');
+  };
+
+  const showDetails = (log: AuditLog) => {
+    setSelectedLog(log);
+    setDetailsVisible(true);
+  };
+
   const columns = [
     {
       title: '时间',
       dataIndex: 'timestamp',
       key: 'timestamp',
-      render: (text: string) => moment(text).format('YYYY-MM-DD HH:mm:ss'),
+      sorter: (a: AuditLog, b: AuditLog) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     },
     {
       title: '用户',
       dataIndex: 'username',
       key: 'username',
-      render: (text: string) => text || '-',
     },
     {
-      title: '事件类型',
-      dataIndex: 'event_type',
-      key: 'event_type',
-      render: (text: string) => {
-        let color = 'blue';
-        if (text.includes('login')) color = 'green';
-        if (text.includes('logout')) color = 'orange';
-        if (text.includes('failed')) color = 'red';
-        return <Tag color={color}>{text}</Tag>;
-      },
+      title: '操作',
+      dataIndex: 'action',
+      key: 'action',
+    },
+    {
+      title: '资源',
+      dataIndex: 'resource',
+      key: 'resource',
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <Tag color={status === 'success' ? 'green' : 'red'}>
+          {status === 'success' ? '成功' : '失败'}
+        </Tag>
+      ),
     },
     {
       title: 'IP地址',
       dataIndex: 'ip_address',
       key: 'ip_address',
-      render: (text: string) => text || '-',
     },
     {
-      title: '状态',
-      dataIndex: 'success',
-      key: 'success',
-      render: (success: boolean) => (
-        <Tag color={success ? 'green' : 'red'} icon={success ? <CheckCircleOutlined /> : <CloseCircleOutlined />}>
-          {success ? '成功' : '失败'}
-        </Tag>
+      title: '操作',
+      key: 'action',
+      render: (_: any, record: AuditLog) => (
+        <Button
+          type="link"
+          icon={<EyeOutlined />}
+          onClick={() => showDetails(record)}
+        >
+          详情
+        </Button>
       ),
-    },
-    {
-      title: '详情',
-      dataIndex: 'details',
-      key: 'details',
-      render: (text: string) => {
-        if (!text) return '-';
-        try {
-          const details = JSON.parse(text);
-          return (
-            <ul style={{ margin: 0, paddingLeft: 20 }}>
-              {Object.entries(details).map(([key, value]) => (
-                <li key={key}>
-                  <strong>{key}:</strong> {String(value)}
-                </li>
-              ))}
-            </ul>
-          );
-        } catch (e) {
-          return text;
-        }
-      },
     },
   ];
 
   return (
     <div className="audit-logs">
-      <div className="page-header">
-        <h2>审计日志</h2>
-      </div>
-      
-      <Card style={{ marginBottom: 16 }}>
-        <Form
-          form={form}
-          layout="horizontal"
-          onFinish={handleSearch}
+      <Card>
+        <Title level={3}>审计日志</Title>
+
+        <Row gutter={16} style={{ marginBottom: 24 }}>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="总日志数"
+                value={total}
+                prefix={<FileSearchOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="成功操作"
+                value={logs ? logs.filter(log => log.status === 'success').length : 0}
+                prefix={<SafetyOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="失败操作"
+                value={logs ? logs.filter(log => log.status === 'failed').length : 0}
+                prefix={<SafetyOutlined />}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        <Space style={{ marginBottom: 16 }}>
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => setDateRange(dates as [Dayjs, Dayjs])}
+          />
+          <Select
+            style={{ width: 200 }}
+            placeholder="选择事件类型"
+            value={eventType}
+            onChange={setEventType}
+            allowClear
+          >
+            <Option value="login">登录</Option>
+            <Option value="logout">登出</Option>
+            <Option value="create">创建</Option>
+            <Option value="update">更新</Option>
+            <Option value="delete">删除</Option>
+          </Select>
+          <Input
+            placeholder="搜索..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            prefix={<SearchOutlined />}
+            style={{ width: 200 }}
+          />
+          <Button type="primary" onClick={handleSearch}>
+            搜索
+          </Button>
+          <Button icon={<ExportOutlined />} onClick={handleExport}>
+            导出
+          </Button>
+        </Space>
+
+        <Table
+          columns={columns}
+          dataSource={logs}
+          rowKey="id"
+          loading={loading}
+        />
+
+        <Modal
+          title="日志详情"
+          open={detailsVisible}
+          onCancel={() => setDetailsVisible(false)}
+          footer={null}
+          width={800}
         >
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item name="username" label="用户名">
-                <Input placeholder="输入用户名" />
-              </Form.Item>
-            </Col>
-            
-            <Col span={6}>
-              <Form.Item name="event_type" label="事件类型">
-                <Select placeholder="选择事件类型" allowClear>
-                  {eventTypes.map(type => (
-                    <Option key={type} value={type}>{type}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            
-            <Col span={6}>
-              <Form.Item name="success" label="状态">
-                <Select placeholder="选择状态" allowClear>
-                  <Option value={true}>成功</Option>
-                  <Option value={false}>失败</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            
-            <Col span={6}>
-              <Form.Item name="date_range" label="时间范围">
-                <RangePicker showTime />
-              </Form.Item>
-            </Col>
-          </Row>
-          
-          <Row>
-            <Col span={24} style={{ textAlign: 'right' }}>
-              <Space>
-                <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>
-                  搜索
-                </Button>
-                <Button onClick={handleReset} icon={<ReloadOutlined />}>
-                  重置
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-        </Form>
+          {selectedLog && (
+            <div>
+              <p><strong>时间：</strong>{selectedLog.timestamp}</p>
+              <p><strong>用户：</strong>{selectedLog.username}</p>
+              <p><strong>操作：</strong>{selectedLog.action}</p>
+              <p><strong>资源：</strong>{selectedLog.resource}</p>
+              <p><strong>状态：</strong>{selectedLog.status}</p>
+              <p><strong>IP地址：</strong>{selectedLog.ip_address}</p>
+              <p><strong>详细信息：</strong></p>
+              <pre>{JSON.stringify(selectedLog.details, null, 2)}</pre>
+            </div>
+          )}
+        </Modal>
       </Card>
-      
-      <Table 
-        columns={columns} 
-        dataSource={logs} 
-        rowKey="id" 
-        loading={loading}
-        pagination={{ pageSize: 10 }}
-      />
     </div>
   );
 };

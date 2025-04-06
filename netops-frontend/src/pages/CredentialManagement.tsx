@@ -16,7 +16,9 @@ import {
   Tag,
   Row,
   Col,
-  Divider
+  Divider,
+  Statistic,
+  Badge
 } from 'antd';
 import {
   PlusOutlined,
@@ -26,10 +28,17 @@ import {
   KeyOutlined,
   ApiOutlined,
   UserOutlined,
-  QuestionCircleOutlined
+  QuestionCircleOutlined,
+  EyeInvisibleOutlined,
+  LockOutlined,
+  DatabaseOutlined,
+  CloudServerOutlined,
+  SafetyCertificateOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
-// 导入认证API替代直接的axios
-import api from '../services/auth';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -59,6 +68,7 @@ interface Credential {
   passphrase?: string;
   created_at: string;
   updated_at: string;
+  status: string;
 }
 
 const CredentialManagement: React.FC = () => {
@@ -73,6 +83,15 @@ const CredentialManagement: React.FC = () => {
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [selectedCredentialType, setSelectedCredentialType] = useState<CredentialType | null>(null);
   const [form] = Form.useForm();
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [showPassword, setShowPassword] = useState<{ [key: number]: boolean }>({});
+  const [credentialTypes] = useState([
+    { value: 'ssh', label: 'SSH密钥', icon: <KeyOutlined /> },
+    { value: 'password', label: '密码', icon: <LockOutlined /> },
+    { value: 'api', label: 'API密钥', icon: <SafetyCertificateOutlined /> },
+    { value: 'database', label: '数据库', icon: <DatabaseOutlined /> },
+    { value: 'cloud', label: '云服务', icon: <CloudServerOutlined /> }
+  ]);
 
   // 加载凭证数据
   const fetchCredentials = async () => {
@@ -82,7 +101,7 @@ const CredentialManagement: React.FC = () => {
       if (credentialTypeFilter) {
         url += `?credential_type=${credentialTypeFilter}`;
       }
-      const response = await api.get(url);
+      const response = await request.get(url);
       setCredentials(response.data);
     } catch (error) {
       console.error('获取凭证列表失败:', error);
@@ -172,7 +191,7 @@ const CredentialManagement: React.FC = () => {
             break;
         }
         
-        await api.post(url, values);
+        await request.post(url, values);
         message.success('凭证创建成功');
       } else if (modalType === 'edit' && currentCredential) {
         // 编辑凭证
@@ -184,7 +203,7 @@ const CredentialManagement: React.FC = () => {
           }
         }
         
-        await api.put(`/device/credential/${currentCredential.id}`, updateData);
+        await request.put(`/device/credential/${currentCredential.id}`, updateData);
         message.success('凭证更新成功');
       }
       
@@ -200,7 +219,7 @@ const CredentialManagement: React.FC = () => {
   // 处理凭证删除
   const handleDelete = async (id: number) => {
     try {
-      await api.delete(`/device/credential/${id}`);
+      await request.delete(`/device/credential/${id}`);
       message.success('凭证删除成功');
       fetchCredentials();
     } catch (error) {
@@ -402,29 +421,58 @@ const CredentialManagement: React.FC = () => {
   return (
     <div className="credential-management">
       <Card>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-          <Title level={3}>凭证管理</Title>
-          <Space>
-            <Select
-              style={{ width: 150 }}
-              placeholder="按类型筛选"
-              allowClear
-              onChange={(value) => setCredentialTypeFilter(value)}
-            >
-              <Option value={CredentialType.SSH_PASSWORD}>SSH密码凭证</Option>
-              <Option value={CredentialType.API_KEY}>API凭证</Option>
-              <Option value={CredentialType.SSH_KEY}>SSH密钥凭证</Option>
-            </Select>
-            <Button 
-              type="primary" 
-              icon={<PlusOutlined />} 
-              onClick={showCreateTypeModal}
-            >
-              添加凭证
-            </Button>
-          </Space>
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="总凭证数"
+                value={credentials.length}
+                prefix={<SafetyCertificateOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="活跃凭证"
+                value={credentials.filter(c => c.status === 'active').length}
+                prefix={<CheckCircleOutlined />}
+                valueStyle={{ color: '#3f8600' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="待验证"
+                value={credentials.filter(c => c.status === 'pending').length}
+                prefix={<ExclamationCircleOutlined />}
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card>
+              <Statistic
+                title="已过期"
+                value={credentials.filter(c => c.status === 'expired').length}
+                prefix={<CloseCircleOutlined />}
+                valueStyle={{ color: '#cf1322' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        <div style={{ marginBottom: 16 }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={showCreateTypeModal}
+          >
+            添加凭证
+          </Button>
         </div>
-        
+
         <Table
           columns={columns}
           dataSource={credentials}

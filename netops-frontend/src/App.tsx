@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import zhCN from 'antd/lib/locale/zh_CN';
+import request from './utils/request';
 
 // 页面组件
 import Login from './pages/Login';
@@ -22,9 +23,6 @@ import CredentialManagement from './pages/CredentialManagement';
 // 样式
 import './styles/App.css';
 
-// 服务
-import { checkAuth } from './services/auth';
-
 // 受保护的路由组件
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -34,7 +32,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     const verifyAuth = async () => {
       try {
         console.log('Verifying authentication...');
-        const isAuth = await checkAuth();
+        const response = await request.get('/api/auth/verify');
+        const isAuth = response.status === 200;
         console.log('Authentication result:', isAuth);
         setIsAuthenticated(isAuth);
         if (!isAuth) {

@@ -1,11 +1,11 @@
-import api from './auth';
+import request from '../utils/request';
 
 /**
  * 获取设备配置内容
  * @param deviceId 设备ID
  */
 export const getConfigContent = async (deviceId: string) => {
-  return api.get(`/api/v1/config/${deviceId}`);
+  return request.get(`/api/v1/config/${deviceId}`);
 };
 
 /**
@@ -14,7 +14,7 @@ export const getConfigContent = async (deviceId: string) => {
  * @param content 配置内容
  */
 export const saveConfig = async (deviceId: string, content: string) => {
-  return api.post(`/api/v1/config/${deviceId}`, { content });
+  return request.post(`/api/v1/config/${deviceId}`, { content });
 };
 
 /**
@@ -22,7 +22,7 @@ export const saveConfig = async (deviceId: string, content: string) => {
  * @param deviceId 设备ID
  */
 export const getConfigHistory = async (deviceId: string) => {
-  return api.get(`/api/v1/config/${deviceId}/history`);
+  return request.get(`/api/v1/config/${deviceId}/history`);
 };
 
 /**
@@ -31,7 +31,7 @@ export const getConfigHistory = async (deviceId: string) => {
  * @param version 版本号
  */
 export const rollbackConfig = async (deviceId: string, version: string) => {
-  return api.post(`/api/v1/config/${deviceId}/rollback`, { version });
+  return request.post(`/api/v1/config/${deviceId}/rollback`, { version });
 };
 
 /**
@@ -41,7 +41,7 @@ export const rollbackConfig = async (deviceId: string, version: string) => {
  * @param version2 版本2
  */
 export const compareConfigs = async (deviceId: string, version1: string, version2: string) => {
-  return api.get(`/api/v1/config/${deviceId}/compare`, {
+  return request.get(`/api/v1/config/${deviceId}/compare`, {
     params: { version1, version2 }
   });
 }; 

@@ -1,6 +1,14 @@
 import React from 'react';
-import api from '../services/auth';
+import request from './request';
 import { message } from 'antd';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+// 配置 dayjs 使用 UTC 和时区插件
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault('Asia/Shanghai'); // 设置默认时区为 UTC+8
 
 interface SessionManagerOptions {
   defaultTimeout?: number; // 默认超时时间（分钟）
@@ -23,6 +31,7 @@ class SessionManager {
   ];
   private onTimeout: () => void;
   private onWarning: () => void;
+  private lastActivityTime: number = 0;
 
   constructor(options: SessionManagerOptions = {}) {
     this.timeoutMinutes = options.defaultTimeout || 30;
@@ -36,14 +45,14 @@ class SessionManager {
    */
   private defaultTimeoutHandler = async (): Promise<void> => {
     try {
-      await api.post('/auth/logout');
+      await request.post('/auth/logout');
       localStorage.removeItem('token');
-      localStorage.removeItem('username');
+      localStorage.removeItem('refreshToken');
       window.location.href = '/login';
     } catch (error) {
       console.error('登出失败:', error);
       localStorage.removeItem('token');
-      localStorage.removeItem('username');
+      localStorage.removeItem('refreshToken');
       window.location.href = '/login';
     }
   }
@@ -201,7 +210,7 @@ class SessionManager {
   private async getTimeoutFromServer(): Promise<number | null> {
     try {
       // 先尝试获取当前用户信息，确认是否有权限
-      const userResponse = await api.get('/auth/me');
+      const userResponse = await request.get('/auth/me');
       const userRole = userResponse.data?.role;
       
       // 如果不是管理员，使用默认设置
@@ -211,7 +220,7 @@ class SessionManager {
       }
       
       // 获取安全设置
-      const response = await api.get('/security/settings');
+      const response = await request.get('/security/settings');
       if (response.data && response.data.session_timeout_minutes) {
         return response.data.session_timeout_minutes;
       }
@@ -239,6 +248,25 @@ class SessionManager {
    */
   public getWarningTimeSeconds(): number {
     return this.warningTimeSeconds;
+  }
+
+  /**
+   * 更新最后活动时间
+   */
+  public updateLastActivity(): void {
+    const now = dayjs().tz('Asia/Shanghai');
+    this.lastActivityTime = now.valueOf();
+    localStorage.setItem('lastActivityTime', this.lastActivityTime.toString());
+  }
+
+  /**
+   * 检查会话是否超时
+   */
+  public checkSessionTimeout(): boolean {
+    const now = dayjs().tz('Asia/Shanghai');
+    const lastActivity = dayjs(this.lastActivityTime).tz('Asia/Shanghai');
+    const diffMinutes = now.diff(lastActivity, 'minute');
+    return diffMinutes >= this.timeoutMinutes;
   }
 }
 

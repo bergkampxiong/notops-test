@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Table, Button, Space, Modal, Form, Input, 
-  Select, Switch, message, Popconfirm, Tag, Tooltip 
+  Select, Switch, message, Popconfirm, Tag, Tooltip, Typography, Card, Row, Col, Statistic 
 } from 'antd';
 import { 
   UserOutlined, LockOutlined, SafetyOutlined, 
   EditOutlined, DeleteOutlined, PlusOutlined, 
-  QuestionCircleOutlined, SyncOutlined, StopOutlined, CheckCircleOutlined 
+  QuestionCircleOutlined, SyncOutlined, StopOutlined, CheckCircleOutlined, UserAddOutlined, TeamOutlined 
 } from '@ant-design/icons';
-import api from '../../services/auth';
+import request from '../../utils/request';
 
 const { Option } = Select;
+const { Title } = Typography;
 
 interface User {
   id: number;
@@ -22,6 +23,7 @@ interface User {
   role: string;
   totp_enabled: boolean;
   last_login: string;
+  created_at: string;
 }
 
 const UserManagement: React.FC = () => {
@@ -40,11 +42,11 @@ const UserManagement: React.FC = () => {
     try {
       console.log('Fetching users...');
       // 先检查认证状态
-      const authCheck = await api.get('/auth/verify');
+      const authCheck = await request.get('/auth/verify');
       console.log('Auth check:', authCheck.data);
       
       // 获取用户列表
-      const response = await api.get('/users/');
+      const response = await request.get('/users/');
       console.log('Users response:', response.data);
       setUsers(response.data);
     } catch (error: any) {
@@ -111,11 +113,11 @@ const UserManagement: React.FC = () => {
       
       if (editingUser) {
         // 更新用户
-        await api.put(`/users/${editingUser.id}`, values);
+        await request.put(`/users/${editingUser.id}`, values);
         message.success('用户更新成功');
       } else {
         // 创建用户
-        await api.post('/users/create', values);
+        await request.post('/users/create', values);
         message.success('用户创建成功');
       }
       
@@ -132,7 +134,7 @@ const UserManagement: React.FC = () => {
     try {
       const values = await resetPasswordForm.validateFields();
       
-      await api.post('/users/reset-password', {
+      await request.post('/users/reset-password', {
         username: editingUser?.username,
         new_password: values.password
       });
@@ -148,7 +150,7 @@ const UserManagement: React.FC = () => {
   // 禁用/启用用户
   const toggleUserStatus = async (user: User) => {
     try {
-      await api.post('/users/disable', {
+      await request.post('/users/disable', {
         username: user.username,
         enable: !user.is_active
       });
@@ -164,7 +166,7 @@ const UserManagement: React.FC = () => {
   // 启用/禁用2FA
   const toggle2FA = async (user: User) => {
     try {
-      await api.post('/users/toggle-2fa', {
+      await request.post('/users/toggle-2fa', {
         username: user.username,
         enable: !user.totp_enabled
       });
@@ -180,7 +182,7 @@ const UserManagement: React.FC = () => {
   // 删除用户
   const deleteUser = async (user: User) => {
     try {
-      await api.post('/users/delete', {
+      await request.post('/users/delete', {
         username: user.username
       });
       
@@ -258,6 +260,11 @@ const UserManagement: React.FC = () => {
       render: (text: string) => text ? new Date(text).toLocaleString() : '-',
     },
     {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+    },
+    {
       title: '操作',
       key: 'action',
       render: (_: any, record: User) => (
@@ -323,149 +330,181 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="user-management">
-      <div className="page-header">
-        <h2>用户管理</h2>
+      <Card>
+        <Title level={3}>用户管理</Title>
+
+        <Row gutter={16} style={{ marginBottom: 24 }}>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="总用户数"
+                value={users.length}
+                prefix={<TeamOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="活跃用户"
+                value={users.filter(user => user.is_active).length}
+                prefix={<UserOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="管理员数量"
+                value={users.filter(user => user.role === 'Admin').length}
+                prefix={<LockOutlined />}
+              />
+            </Card>
+          </Col>
+        </Row>
+
         <Button 
           type="primary" 
-          icon={<PlusOutlined />} 
+          icon={<UserAddOutlined />} 
           onClick={showCreateModal}
+          style={{ marginBottom: 16 }}
         >
-          创建用户
+          添加用户
         </Button>
-      </div>
-      
-      <Table 
-        columns={columns} 
-        dataSource={users} 
-        rowKey="id" 
-        loading={loading}
-        pagination={{ pageSize: 10 }}
-      />
-      
-      {/* 创建/编辑用户模态框 */}
-      <Modal
-        title={modalTitle}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
-        okText="确定"
-        cancelText="取消"
-      >
-        <Form
-          form={form}
-          layout="vertical"
+
+        <Table 
+          columns={columns} 
+          dataSource={users} 
+          rowKey="id" 
+          loading={loading}
+          pagination={{ pageSize: 10 }}
+        />
+        
+        {/* 创建/编辑用户模态框 */}
+        <Modal
+          title={modalTitle}
+          open={modalVisible}
+          onOk={handleSubmit}
+          onCancel={() => setModalVisible(false)}
+          okText="确定"
+          cancelText="取消"
         >
-          <Form.Item
-            name="username"
-            label="用户名"
-            rules={[{ required: true, message: '请输入用户名' }]}
+          <Form
+            form={form}
+            layout="vertical"
           >
-            <Input prefix={<UserOutlined />} disabled={!!editingUser} />
-          </Form.Item>
-          
-          {!editingUser && (
+            <Form.Item
+              name="username"
+              label="用户名"
+              rules={[{ required: true, message: '请输入用户名' }]}
+            >
+              <Input prefix={<UserOutlined />} disabled={!!editingUser} />
+            </Form.Item>
+            
+            {!editingUser && (
+              <Form.Item
+                name="password"
+                label="密码"
+                rules={[{ required: true, message: '请输入密码' }]}
+              >
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+            )}
+            
+            <Form.Item
+              name="email"
+              label="邮箱"
+              rules={[
+                { type: 'email', message: '请输入有效的邮箱地址' },
+                { required: true, message: '请输入邮箱' }
+              ]}
+            >
+              <Input />
+            </Form.Item>
+            
+            <Form.Item
+              name="department"
+              label="部门"
+            >
+              <Input />
+            </Form.Item>
+            
+            <Form.Item
+              name="role"
+              label="角色"
+              rules={[{ required: true, message: '请选择角色' }]}
+            >
+              <Select>
+                <Select.Option value="Admin">管理员</Select.Option>
+                <Select.Option value="Operator">操作员</Select.Option>
+                <Select.Option value="Auditor">审计员</Select.Option>
+              </Select>
+            </Form.Item>
+            
+            <Form.Item
+              name="totp_enabled"
+              label="启用双因素认证"
+              valuePropName="checked"
+            >
+              <Switch />
+            </Form.Item>
+            
+            <Form.Item
+              name="is_active"
+              label="启用账户"
+              valuePropName="checked"
+              initialValue={true}
+            >
+              <Switch />
+            </Form.Item>
+          </Form>
+        </Modal>
+        
+        {/* 重置密码模态框 */}
+        <Modal
+          title="重置密码"
+          open={resetPasswordModal}
+          onOk={handleResetPassword}
+          onCancel={() => setResetPasswordModal(false)}
+          okText="确定"
+          cancelText="取消"
+        >
+          <Form
+            form={resetPasswordForm}
+            layout="vertical"
+          >
             <Form.Item
               name="password"
-              label="密码"
-              rules={[{ required: true, message: '请输入密码' }]}
+              label="新密码"
+              rules={[
+                { required: true, message: '请输入新密码' },
+                { min: 6, message: '密码长度不能少于6个字符' }
+              ]}
             >
               <Input.Password prefix={<LockOutlined />} />
             </Form.Item>
-          )}
-          
-          <Form.Item
-            name="email"
-            label="邮箱"
-            rules={[
-              { type: 'email', message: '请输入有效的邮箱地址' },
-              { required: true, message: '请输入邮箱' }
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          
-          <Form.Item
-            name="department"
-            label="部门"
-          >
-            <Input />
-          </Form.Item>
-          
-          <Form.Item
-            name="role"
-            label="角色"
-            rules={[{ required: true, message: '请选择角色' }]}
-          >
-            <Select>
-              <Select.Option value="Admin">管理员</Select.Option>
-              <Select.Option value="Operator">操作员</Select.Option>
-              <Select.Option value="Auditor">审计员</Select.Option>
-            </Select>
-          </Form.Item>
-          
-          <Form.Item
-            name="totp_enabled"
-            label="启用双因素认证"
-            valuePropName="checked"
-          >
-            <Switch />
-          </Form.Item>
-          
-          <Form.Item
-            name="is_active"
-            label="启用账户"
-            valuePropName="checked"
-            initialValue={true}
-          >
-            <Switch />
-          </Form.Item>
-        </Form>
-      </Modal>
-      
-      {/* 重置密码模态框 */}
-      <Modal
-        title="重置密码"
-        open={resetPasswordModal}
-        onOk={handleResetPassword}
-        onCancel={() => setResetPasswordModal(false)}
-        okText="确定"
-        cancelText="取消"
-      >
-        <Form
-          form={resetPasswordForm}
-          layout="vertical"
-        >
-          <Form.Item
-            name="password"
-            label="新密码"
-            rules={[
-              { required: true, message: '请输入新密码' },
-              { min: 6, message: '密码长度不能少于6个字符' }
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined />} />
-          </Form.Item>
-          
-          <Form.Item
-            name="confirmPassword"
-            label="确认密码"
-            dependencies={['password']}
-            rules={[
-              { required: true, message: '请确认密码' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('两次输入的密码不一致'));
-                },
-              }),
-            ]}
-          >
-            <Input.Password prefix={<LockOutlined />} />
-          </Form.Item>
-        </Form>
-      </Modal>
+            
+            <Form.Item
+              name="confirmPassword"
+              label="确认密码"
+              dependencies={['password']}
+              rules={[
+                { required: true, message: '请确认密码' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('password') === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('两次输入的密码不一致'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password prefix={<LockOutlined />} />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Card>
     </div>
   );
 };

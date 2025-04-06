@@ -8,7 +8,7 @@ import {
   CloseCircleOutlined, WarningOutlined, SyncOutlined,
   FileExcelOutlined, CheckOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import request from '../../utils/request';
 import moment from 'moment';
 import './Inventory.css';
 
@@ -85,7 +85,7 @@ const CMDBInventory: React.FC = () => {
   const fetchAssets = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/cmdb/assets');
+      const response = await request.get('/api/cmdb/assets');
       setAssets(response.data);
       
       // 初始化盘点状态

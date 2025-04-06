@@ -28,7 +28,7 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../utils/api';
+import request from '../utils/request';
 
 const { Sider, Content } = Layout;
 const { Option } = Select;
@@ -84,7 +84,7 @@ const CategoryManagement: React.FC = () => {
   const fetchGroups = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/api/device/category/groups');
+      const response = await request.get('/api/device/category/groups');
       setGroups(response.data);
     } catch (error) {
       message.error('获取设备分组失败');
@@ -100,7 +100,7 @@ const CategoryManagement: React.FC = () => {
   // 创建设备分组
   const handleSubmit = async (values: any) => {
     try {
-      await api.post('/api/device/category/groups', values);
+      await request.post('/api/device/category/groups', values);
       message.success('创建设备分组成功');
       setIsModalVisible(false);
       form.resetFields();
@@ -113,7 +113,7 @@ const CategoryManagement: React.FC = () => {
   // 删除设备分组
   const handleDelete = async (id: number) => {
     try {
-      await api.delete(`/api/device/category/groups/${id}`);
+      await request.delete(`/api/device/category/groups/${id}`);
       message.success('删除设备分组成功');
       fetchGroups();
     } catch (error) {
@@ -226,7 +226,7 @@ const MemberManagement: React.FC = () => {
   // 获取设备类型列表
   const fetchDeviceTypes = async () => {
     try {
-      const response = await api.get('/api/device/category/device-types');
+      const response = await request.get('/api/device/category/device-types');
       console.log('获取到的设备类型列表:', response.data);
       // 过滤掉英文选项
       const filteredTypes = response.data.filter((type: DeviceType) => 
@@ -251,7 +251,7 @@ const MemberManagement: React.FC = () => {
   // 获取位置列表
   const fetchLocations = async () => {
     try {
-      const response = await api.get('/api/device/category/locations');
+      const response = await request.get('/api/device/category/locations');
       console.log('获取到的位置列表:', response.data);
       setLocations(response.data);
       
@@ -272,7 +272,7 @@ const MemberManagement: React.FC = () => {
   // 获取设备分组列表
   const fetchGroups = async () => {
     try {
-      const response = await api.get('/api/device/category/groups');
+      const response = await request.get('/api/device/category/groups');
       setGroups(response.data);
     } catch (error) {
       message.error('获取设备分组失败');
@@ -330,7 +330,7 @@ const MemberManagement: React.FC = () => {
     setLoading(true);
     try {
       console.log('查询参数:', values);
-      const response = await api.get('/api/device/category/cmdb-devices', {
+      const response = await request.get('/api/device/category/cmdb-devices', {
         params: {
           name: values.name,
           ip_address: values.ip_address,
@@ -405,7 +405,7 @@ const MemberManagement: React.FC = () => {
   // 检查设备是否已在分组中
   const checkDevicesInGroup = async (groupId: number): Promise<boolean> => {
     try {
-      const response = await api.get(`/api/device/category/groups/${groupId}/members`);
+      const response = await request.get(`/api/device/category/groups/${groupId}/members`);
       const groupMembers = response.data;
       
       // 获取组内设备的ID列表
@@ -442,7 +442,7 @@ const MemberManagement: React.FC = () => {
   // 实际添加设备到分组
   const addDevicesToGroup = async (groupId: number, deviceIds: number[]) => {
     try {
-      await api.post(`/api/device/category/groups/${groupId}/members`, {
+      await request.post(`/api/device/category/groups/${groupId}/members`, {
         device_ids: deviceIds
       });
       message.success('添加设备到分组成功');
@@ -643,7 +643,7 @@ const MemberDisplay: React.FC = () => {
   // 获取设备分组列表
   const fetchGroups = async () => {
     try {
-      const response = await api.get('/api/device/category/groups');
+      const response = await request.get('/api/device/category/groups');
       setGroups(response.data);
     } catch (error) {
       message.error('获取设备分组失败');
@@ -653,7 +653,7 @@ const MemberDisplay: React.FC = () => {
   // 获取设备类型列表
   const fetchDeviceTypes = async () => {
     try {
-      const response = await api.get('/api/device/category/device-types');
+      const response = await request.get('/api/device/category/device-types');
       console.log('获取到的设备类型列表:', response.data);
       // 过滤掉英文选项
       const filteredTypes = response.data.filter((type: DeviceType) => 
@@ -678,7 +678,7 @@ const MemberDisplay: React.FC = () => {
   // 获取位置列表
   const fetchLocations = async () => {
     try {
-      const response = await api.get('/api/device/category/locations');
+      const response = await request.get('/api/device/category/locations');
       console.log('获取到的位置列表:', response.data);
       setLocations(response.data);
       
@@ -699,7 +699,7 @@ const MemberDisplay: React.FC = () => {
   // 从CMDB获取设备详情
   const fetchDeviceDetails = async (deviceId: number) => {
     try {
-      const response = await api.get(`/api/cmdb/assets/${deviceId}`);
+      const response = await request.get(`/api/cmdb/assets/${deviceId}`);
       console.log(`获取设备${deviceId}详情:`, response.data);
       return response.data;
     } catch (error) {
@@ -712,7 +712,7 @@ const MemberDisplay: React.FC = () => {
   const fetchMembers = async (groupId: number) => {
     setLoading(true);
     try {
-      const response = await api.get(`/api/device/category/groups/${groupId}/members`);
+      const response = await request.get(`/api/device/category/groups/${groupId}/members`);
       console.log('获取到的分组成员数据:', response.data);
       
       if (response.data.length > 0) {
@@ -859,7 +859,7 @@ const MemberDisplay: React.FC = () => {
     if (!selectedGroup) return;
     
     try {
-      await api.delete(`/api/device/category/groups/${selectedGroup}/members/${memberId}`);
+      await request.delete(`/api/device/category/groups/${selectedGroup}/members/${memberId}`);
       message.success('成员删除成功');
       // 重新获取成员列表
       fetchMembers(selectedGroup);
@@ -883,7 +883,7 @@ const MemberDisplay: React.FC = () => {
         .filter(member => selectedRowKeys.includes(member.id))
         .map(member => member.device_id);
       
-      await api.delete(`/api/device/category/groups/${selectedGroup}/members`, {
+      await request.delete(`/api/device/category/groups/${selectedGroup}/members`, {
         data: { device_ids: deviceIds }
       });
       

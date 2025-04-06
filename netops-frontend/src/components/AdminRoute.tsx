@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { getCurrentUser } from '../services/auth';
+import request from '../utils/request';
 
 interface AdminRouteProps {
   children: React.ReactNode;
@@ -10,21 +10,16 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const checkAdminRole = async () => {
+    const checkAdminStatus = async () => {
       try {
-        const userInfo = await getCurrentUser();
-        if (userInfo && userInfo.role === 'Admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
+        const response = await request.get('/auth/me');
+        setIsAdmin(response.data.role === 'Admin');
       } catch (error) {
-        console.error('获取用户信息失败:', error);
         setIsAdmin(false);
       }
     };
 
-    checkAdminRole();
+    checkAdminStatus();
   }, []);
 
   // 加载状态

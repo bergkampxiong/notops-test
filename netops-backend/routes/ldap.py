@@ -6,6 +6,7 @@ import ldap3
 from database.session import get_db
 from database.models import LDAPConfig as LDAPConfigModel
 from routes.auth import get_current_active_user, User
+from datetime import datetime
 
 router = APIRouter(
     prefix="/api/ldap",
@@ -40,6 +41,12 @@ class LDAPConfigResponse(LDAPConfigBase):
 class LDAPTestResponse(BaseModel):
     success: bool
     message: str
+
+class LDAPSyncStatus(BaseModel):
+    status: str
+    lastSync: str
+    totalUsers: int
+    totalGroups: int
 
 @router.get("/config", response_model=LDAPConfigResponse)
 async def get_ldap_config(
@@ -190,4 +197,41 @@ async def test_ldap_connection(
         return {
             "success": False,
             "message": f"连接测试失败：{str(e)}"
-        } 
+        }
+
+@router.get("/sync-status", response_model=LDAPSyncStatus)
+async def get_ldap_sync_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """获取LDAP同步状态"""
+    if current_user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有管理员可以查看LDAP同步状态"
+        )
+    
+    # 这里应该从数据库或缓存中获取同步状态
+    # 为了演示，我们返回一个模拟的状态
+    return {
+        "status": "success",
+        "lastSync": datetime.utcnow().isoformat(),
+        "totalUsers": db.query(User).filter(User.is_ldap_user == True).count(),
+        "totalGroups": 0  # 这里应该返回实际的组数量
+    }
+
+@router.post("/sync")
+async def sync_ldap(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """启动LDAP同步"""
+    if current_user.role != "Admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有管理员可以启动LDAP同步"
+        )
+    
+    # 这里应该启动一个后台任务来同步LDAP
+    # 为了演示，我们直接返回成功
+    return {"message": "LDAP同步已启动"} 

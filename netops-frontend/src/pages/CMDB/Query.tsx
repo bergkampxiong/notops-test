@@ -8,7 +8,7 @@ import {
   CloudServerOutlined, UploadOutlined, QuestionCircleOutlined,
   PlusOutlined, DeleteOutlined, EditOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import request from '../../utils/request';
 import './Query.css';
 import moment from 'moment';
 
@@ -87,10 +87,10 @@ const CMDBQuery: React.FC = () => {
   const fetchReferenceData = async () => {
     try {
       const [deviceTypesRes, vendorsRes, statusesRes, locationsRes] = await Promise.all([
-        axios.get('/api/cmdb/device-types'),
-        axios.get('/api/cmdb/vendors'),
-        axios.get('/api/cmdb/statuses'),
-        axios.get('/api/cmdb/locations')
+        request.get('/cmdb/device-types'),
+        request.get('/cmdb/vendors'),
+        request.get('/cmdb/statuses'),
+        request.get('/cmdb/locations')
       ]);
       
       setDeviceTypeOptions(deviceTypesRes.data);
@@ -105,7 +105,7 @@ const CMDBQuery: React.FC = () => {
   // 获取系统类型数据
   const fetchSystemTypes = async () => {
     try {
-      const response = await axios.get('/api/cmdb/system-types');
+      const response = await request.get('/cmdb/system-types');
       setSystemTypes(response.data);
     } catch (error) {
       console.error('获取系统类型数据失败:', error);
@@ -116,7 +116,7 @@ const CMDBQuery: React.FC = () => {
   const fetchAssets = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('/api/cmdb/assets', {
+      const response = await request.get('/cmdb/assets', {
         params: {
           skip: 0,
           limit: 100,
@@ -174,7 +174,7 @@ const CMDBQuery: React.FC = () => {
       );
 
       // 发送查询请求
-      const response = await axios.post('/api/cmdb/assets/query', queryParams);
+      const response = await request.post('/cmdb/assets/query', queryParams);
       
       if (response.data && Array.isArray(response.data)) {
         // 处理数据，确保所有字段都有值
@@ -394,7 +394,7 @@ const CMDBQuery: React.FC = () => {
         warranty_expiry: values.warranty_expiry ? values.warranty_expiry.format('YYYY-MM-DD') : null,
       };
       
-      await axios.post('/api/cmdb/assets', formattedValues);
+      await request.post('/cmdb/assets', formattedValues);
       message.success('设备添加成功');
       setAddDeviceModalVisible(false);
       form.resetFields();
@@ -416,7 +416,7 @@ const CMDBQuery: React.FC = () => {
 
     setDeleteLoading(true);
     try {
-      await axios.post('/api/cmdb/assets/delete', { ids: selectedRowKeys });
+      await request.post('/cmdb/assets/delete', { ids: selectedRowKeys });
       message.success(`成功删除 ${selectedRowKeys.length} 台设备`);
       setSelectedRowKeys([]);
       fetchAssets(); // 刷新数据
@@ -442,7 +442,7 @@ const CMDBQuery: React.FC = () => {
         warranty_expiry: values.warranty_expiry ? values.warranty_expiry.format('YYYY-MM-DD') : null,
       };
       
-      await axios.put(`/api/cmdb/assets/${currentDevice.id}`, formattedValues);
+      await request.put(`/cmdb/assets/${currentDevice.id}`, formattedValues);
       message.success('设备更新成功');
       setEditDeviceModalVisible(false);
       fetchAssets(); // 刷新数据
@@ -703,77 +703,20 @@ const CMDBQuery: React.FC = () => {
 
   // 处理CSV导入
   const handleImport = async (file: File) => {
-    setImportLoading(true);
-
+    const formData = new FormData();
+    formData.append('file', file);
     try {
-      // 检查文件类型
-      if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-        message.error('请上传CSV格式的文件');
-        return false;
-      }
-
-      // 检查文件大小（10MB）
-      if (file.size > 10 * 1024 * 1024) {
-        message.error('文件大小不能超过10MB');
-        return false;
-      }
-
-      // 读取文件内容
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const content = e.target?.result as string;
-          
-          // 将CSV内容发送到后端
-          const response = await axios.post('/api/cmdb/assets/import', 
-            { content },
-            {
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-          
-          // 检查响应状态和数据
-          if (response.status === 200) {
-            const { success, imported, failed, errors } = response.data;
-            
-            if (imported > 0) {
-              message.success(`成功导入 ${imported} 条记录${failed > 0 ? `，${failed} 条记录失败` : ''}`);
-              fetchAssets(); // 刷新数据
-              setImportModalVisible(false);
-            } else if (failed > 0) {
-              message.error(`导入失败：${failed} 条记录导入失败${errors ? `，${errors.join('; ')}` : ''}`);
-            } else {
-              message.warning('没有数据被导入');
-            }
-          } else {
-            message.error('导入失败：服务器响应异常');
-          }
-        } catch (error: any) {
-          console.error('导入失败:', error);
-          const errorMessage = error.response?.data?.detail || error.response?.data?.message || '导入失败，请检查数据格式是否正确';
-          message.error(errorMessage);
-        } finally {
-          setImportLoading(false);
-        }
-      };
-
-      reader.onerror = () => {
-        message.error('文件读取失败');
-        setImportLoading(false);
-      };
-
-      // 以文本格式读取文件
-      reader.readAsText(file, 'UTF-8');
-    } catch (error: any) {
-      console.error('导入失败:', error);
-      const errorMessage = error.response?.data?.detail || error.response?.data?.message || '导入失败，请检查CSV格式是否正确';
-      message.error(errorMessage);
-      setImportLoading(false);
+      const response = await request.post('/cmdb/assets/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      message.success('导入成功');
+      fetchAssets();
+      setImportModalVisible(false);
+    } catch (error) {
+      message.error('导入失败');
     }
-    
-    return false; // 阻止自动上传
   };
 
   // CSV模板示例数据

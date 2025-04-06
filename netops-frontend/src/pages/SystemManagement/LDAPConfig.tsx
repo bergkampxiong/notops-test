@@ -1,248 +1,271 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Form, Input, Button, Card, Switch, 
-  message, Spin, Divider, Alert, Space 
+import {
+  Form,
+  Input,
+  Button,
+  Card,
+  message,
+  Typography,
+  Space,
+  Switch,
+  Divider,
+  Alert,
+  Row,
+  Col,
+  Statistic
 } from 'antd';
-import { 
-  SaveOutlined, SyncOutlined, 
-  CheckCircleOutlined, CloseCircleOutlined 
+import {
+  SaveOutlined,
+  DisconnectOutlined,
+  SyncOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined
 } from '@ant-design/icons';
-import api from '../../services/auth';
+import request from '../../utils/request';
 
 interface LDAPConfigData {
   id?: number;
   server_url: string;
-  bind_dn: string;
-  bind_password: string;
-  search_base: string;
-  user_search_filter: string;
-  group_search_filter?: string;
-  require_2fa: boolean;
-  admin_group_dn?: string;
-  operator_group_dn?: string;
-  auditor_group_dn?: string;
+  base_dn: string;
+  admin_dn: string;
+  admin_password: string;
+  user_search_base: string;
+  group_search_base: string;
+  is_active: boolean;
+  sync_interval: number;
+  last_sync_time?: string;
+  sync_status?: string;
 }
+
+const { Title, Text } = Typography;
 
 const LDAPConfig: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
-  const [testResult, setTestResult] = useState<{success: boolean; message: string} | null>(null);
-  const [configId, setConfigId] = useState<number | null>(null);
-
-  // 获取LDAP配置
-  const fetchLDAPConfig = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/ldap/config');
-      console.log('LDAP配置响应:', response);
-      if (response.data) {
-        form.setFieldsValue(response.data);
-        setConfigId(response.data.id);
-      }
-    } catch (error: any) {
-      console.error('获取LDAP配置失败:', error);
-      if (error.response?.status === 404) {
-        // 如果是404错误，说明还没有配置，清空表单
-        form.resetFields();
-        setConfigId(null);
-        message.info('尚未配置LDAP，请填写以下信息进行配置');
-      } else {
-        message.error('获取LDAP配置失败');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [testing, setTesting] = useState(false);
+  const [config, setConfig] = useState<LDAPConfigData | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{
+    status: string;
+    lastSync: string;
+    totalUsers: number;
+    totalGroups: number;
+  } | null>(null);
 
   useEffect(() => {
-    fetchLDAPConfig();
+    fetchConfig();
+    fetchSyncStatus();
   }, []);
 
-  // 保存LDAP配置
-  const handleSubmit = async (values: LDAPConfigData) => {
-    setLoading(true);
+  const fetchConfig = async () => {
     try {
-      if (configId) {
-        // 更新配置
-        await api.put(`/ldap/config/${configId}`, values);
-      } else {
-        // 创建配置
-        const response = await api.post('/ldap/config', values);
-        setConfigId(response.data.id);
-      }
-      message.success('LDAP配置保存成功');
+      const response = await request.get('/api/ldap/config');
+      setConfig(response.data);
+      form.setFieldsValue(response.data);
     } catch (error) {
-      console.error('保存LDAP配置失败:', error);
-      message.error('保存LDAP配置失败');
-    } finally {
-      setLoading(false);
+      message.error('获取LDAP配置失败');
     }
   };
 
-  // 测试LDAP连接
-  const testConnection = async () => {
+  const fetchSyncStatus = async () => {
+    try {
+      const response = await request.get('/api/ldap/sync-status');
+      setSyncStatus(response.data);
+    } catch (error) {
+      message.error('获取同步状态失败');
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
     try {
       const values = await form.validateFields();
-      setTestLoading(true);
-      setTestResult(null);
-      
-      const response = await api.post('/ldap/test-connection', values);
-      
-      setTestResult({
-        success: response.data.success,
-        message: response.data.message
-      });
-      
+      const response = await request.post('ldap/test-connection', values);
       if (response.data.success) {
         message.success('LDAP连接测试成功');
       } else {
         message.error('LDAP连接测试失败');
       }
     } catch (error) {
-      console.error('测试LDAP连接失败:', error);
-      setTestResult({
-        success: false,
-        message: '测试连接失败，请检查配置'
-      });
-      message.error('测试连接失败，请检查配置');
+      message.error('LDAP连接测试失败');
     } finally {
-      setTestLoading(false);
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const values = await form.validateFields();
+      await request.post('ldap/config', values);
+      message.success('LDAP配置保存成功');
+      fetchConfig();
+    } catch (error) {
+      message.error('LDAP配置保存失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      await request.post('ldap/sync');
+      message.success('LDAP同步已启动');
+      fetchSyncStatus();
+    } catch (error) {
+      message.error('LDAP同步启动失败');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="ldap-config">
-      <div className="page-header">
-        <h2>LDAP配置</h2>
-      </div>
-      
-      <Spin spinning={loading}>
-        <Card>
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-            initialValues={{
-              require_2fa: false,
-              user_search_filter: '(sAMAccountName={username})'
-            }}
+      <Card>
+        <Title level={3}>LDAP配置</Title>
+
+        {syncStatus && (
+          <Row gutter={16} style={{ marginBottom: 24 }}>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="同步状态"
+                  value={syncStatus.status}
+                  valueStyle={{
+                    color: syncStatus.status === 'success' ? '#3f8600' : '#cf1322'
+                  }}
+                  prefix={syncStatus.status === 'success' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="最后同步时间"
+                  value={syncStatus.lastSync}
+                  prefix={<SyncOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="同步用户数"
+                  value={syncStatus.totalUsers}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card>
+                <Statistic
+                  title="同步群组数"
+                  value={syncStatus.totalGroups}
+                  prefix={<CheckCircleOutlined />}
+                />
+              </Card>
+            </Col>
+          </Row>
+        )}
+
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={config || {}}
+        >
+          <Form.Item
+            name="server_url"
+            label="LDAP服务器地址"
+            rules={[{ required: true, message: '请输入LDAP服务器地址' }]}
           >
-            <h3>基本配置</h3>
-            <Form.Item
-              name="server_url"
-              label="LDAP服务器URL"
-              rules={[{ required: true, message: '请输入LDAP服务器URL' }]}
-            >
-              <Input placeholder="例如: ldap://ldap.example.com:389" />
-            </Form.Item>
-            
-            <Form.Item
-              name="bind_dn"
-              label="绑定DN"
-              rules={[{ required: true, message: '请输入绑定DN' }]}
-            >
-              <Input placeholder="例如: cn=admin,dc=example,dc=com" />
-            </Form.Item>
-            
-            <Form.Item
-              name="bind_password"
-              label="绑定密码"
-              rules={[{ required: true, message: '请输入绑定密码' }]}
-            >
-              <Input.Password />
-            </Form.Item>
-            
-            <Form.Item
-              name="search_base"
-              label="搜索基础"
-              rules={[{ required: true, message: '请输入搜索基础' }]}
-            >
-              <Input placeholder="例如: dc=example,dc=com" />
-            </Form.Item>
-            
-            <Form.Item
-              name="user_search_filter"
-              label="用户搜索过滤器"
-              rules={[{ required: true, message: '请输入用户搜索过滤器' }]}
-            >
-              <Input placeholder="例如: (sAMAccountName={username})" />
-            </Form.Item>
-            
-            <Form.Item
-              name="group_search_filter"
-              label="组搜索过滤器"
-            >
-              <Input placeholder="例如: (objectClass=group)" />
-            </Form.Item>
-            
-            <Form.Item
-              name="require_2fa"
-              label="强制LDAP用户启用2FA"
-              valuePropName="checked"
-            >
-              <Switch />
-            </Form.Item>
-            
-            <Divider />
-            
-            <h3>角色映射</h3>
-            <p>将LDAP组映射到系统角色</p>
-            
-            <Form.Item
-              name="admin_group_dn"
-              label="管理员组DN"
-            >
-              <Input placeholder="例如: cn=Administrators,ou=Groups,dc=example,dc=com" />
-            </Form.Item>
-            
-            <Form.Item
-              name="operator_group_dn"
-              label="操作员组DN"
-            >
-              <Input placeholder="例如: cn=Operators,ou=Groups,dc=example,dc=com" />
-            </Form.Item>
-            
-            <Form.Item
-              name="auditor_group_dn"
-              label="审计员组DN"
-            >
-              <Input placeholder="例如: cn=Auditors,ou=Groups,dc=example,dc=com" />
-            </Form.Item>
-            
-            <Divider />
-            
-            {testResult && (
-              <Alert
-                message={testResult.success ? "连接成功" : "连接失败"}
-                description={testResult.message}
-                type={testResult.success ? "success" : "error"}
-                showIcon
-                style={{ marginBottom: 24 }}
-              />
-            )}
-            
+            <Input placeholder="例如: ldap://ldap.example.com:389" />
+          </Form.Item>
+
+          <Form.Item
+            name="base_dn"
+            label="基础DN"
+            rules={[{ required: true, message: '请输入基础DN' }]}
+          >
+            <Input placeholder="例如: dc=example,dc=com" />
+          </Form.Item>
+
+          <Form.Item
+            name="admin_dn"
+            label="管理员DN"
+            rules={[{ required: true, message: '请输入管理员DN' }]}
+          >
+            <Input placeholder="例如: cn=admin,dc=example,dc=com" />
+          </Form.Item>
+
+          <Form.Item
+            name="admin_password"
+            label="管理员密码"
+            rules={[{ required: true, message: '请输入管理员密码' }]}
+          >
+            <Input.Password placeholder="请输入管理员密码" />
+          </Form.Item>
+
+          <Form.Item
+            name="user_search_base"
+            label="用户搜索基础DN"
+            rules={[{ required: true, message: '请输入用户搜索基础DN' }]}
+          >
+            <Input placeholder="例如: ou=users,dc=example,dc=com" />
+          </Form.Item>
+
+          <Form.Item
+            name="group_search_base"
+            label="群组搜索基础DN"
+            rules={[{ required: true, message: '请输入群组搜索基础DN' }]}
+          >
+            <Input placeholder="例如: ou=groups,dc=example,dc=com" />
+          </Form.Item>
+
+          <Form.Item
+            name="sync_interval"
+            label="同步间隔（分钟）"
+            rules={[{ required: true, message: '请输入同步间隔' }]}
+          >
+            <Input type="number" min={1} placeholder="请输入同步间隔（分钟）" />
+          </Form.Item>
+
+          <Form.Item
+            name="is_active"
+            label="启用LDAP"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+
+          <Divider />
+
+          <Form.Item>
             <Space>
-              <Button 
-                type="primary" 
-                htmlType="submit" 
+              <Button
+                type="primary"
                 icon={<SaveOutlined />}
+                onClick={handleSave}
                 loading={loading}
               >
                 保存配置
               </Button>
-              
-              <Button 
-                onClick={testConnection} 
-                icon={<SyncOutlined />}
-                loading={testLoading}
+              <Button
+                icon={<DisconnectOutlined />}
+                onClick={handleTestConnection}
+                loading={testing}
               >
                 测试连接
               </Button>
+              <Button
+                icon={<SyncOutlined />}
+                onClick={handleSync}
+              >
+                立即同步
+              </Button>
             </Space>
-          </Form>
-        </Card>
-      </Spin>
+          </Form.Item>
+        </Form>
+      </Card>
     </div>
   );
 };

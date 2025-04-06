@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout as AntLayout, Menu, Dropdown, Avatar, Button } from 'antd';
+import { Layout as AntLayout, Menu, Dropdown, Avatar, Button, message } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   MenuUnfoldOutlined,
@@ -22,9 +22,11 @@ import {
   BarChartOutlined,
   ScheduleOutlined,
   ApiOutlined,
+  LineChartOutlined,
+  LockOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { logout, getCurrentUser } from '../services/auth';
+import request from '../utils/request';
 
 const { Header, Sider, Content } = AntLayout;
 
@@ -41,10 +43,10 @@ const Layout: React.FC = () => {
   useEffect(() => {
     const fetchUserInfo = async () => {
       try {
-        const userInfo = await getCurrentUser();
-        if (userInfo) {
-          setUserRole(userInfo.role);
-          setUsername(userInfo.username);
+        const response = await request.get('/auth/me');
+        if (response.status === 200) {
+          setUserRole(response.data.role);
+          setUsername(response.data.username);
         }
       } catch (error) {
         console.error('获取用户信息失败:', error);
@@ -68,8 +70,19 @@ const Layout: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/login');
+    try {
+      await request.post('/auth/logout');
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      message.success('已退出登录');
+      navigate('/login');
+    } catch (error) {
+      console.error('退出登录失败:', error);
+      // 即使API调用失败，也清除本地存储并跳转
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      navigate('/login');
+    }
   };
 
   // 获取当前选中的菜单项

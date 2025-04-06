@@ -2,12 +2,19 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Checkbox, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { login } from '../services/auth';
+import request from '../utils/request';
 
 interface LoginFormValues {
   username: string;
   password: string;
   remember: boolean;
+}
+
+interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  refresh_token?: string;
+  expires_in?: number;
 }
 
 const Login: React.FC = () => {
@@ -18,13 +25,46 @@ const Login: React.FC = () => {
     try {
       setLoading(true);
       console.log('Logging in with username:', values.username);
-      const result = await login(values.username, values.password);
-      console.log('Login result:', result);
       
-      if (typeof result === 'boolean' && result) {
+      // 创建表单数据
+      const formData = new URLSearchParams();
+      formData.append('username', values.username);
+      formData.append('password', values.password);
+      
+      // 使用统一的API路径格式，request.ts中已设置baseURL为/api
+      console.log('Sending login request to /auth/login (will be prefixed with /api)');
+      const response = await request.post<LoginResponse>('/auth/login', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+      
+      console.log('Login response:', response);
+      
+      const token = response.data.access_token;
+      console.log('Token received:', token);
+      
+      if (token && typeof token === 'string' && token.startsWith('2FA_REQUIRED_')) {
+        // 需要2FA
+        const needSetup = token.includes('_SETUP_');
+        console.log('2FA required, setup mode:', needSetup, 'token:', token);
+        
+        if (needSetup) {
+          // 首次登录，需要设置2FA
+          console.log('Redirecting to 2FA setup page');
+          message.info('首次登录需要设置双因素认证');
+          navigate(`/2fa-verify?username=${values.username}&mode=setup`);
+        } else {
+          // 非首次登录，需要验证2FA
+          console.log('Redirecting to 2FA verification page');
+          navigate(`/2fa-verify?username=${values.username}`);
+        }
+      } else if (token) {
         // 登录成功，无需2FA
         console.log('Login successful, no 2FA required');
         message.success('登录成功');
+        localStorage.setItem('token', token);
+        localStorage.setItem('username', values.username);
         
         // 检查是否有重定向参数
         const params = new URLSearchParams(window.location.search);
@@ -40,22 +80,6 @@ const Login: React.FC = () => {
           console.log('Redirecting to home page');
           navigate('/');
         }
-      } else if (typeof result === 'object') {
-        // 需要2FA
-        console.log('2FA required, needSetup:', result.needSetup);
-        if (result.needSetup) {
-          // 首次登录，需要设置2FA
-          console.log('Redirecting to 2FA setup page');
-          message.info('首次登录需要设置双因素认证');
-          navigate(`/2fa-verify?username=${values.username}&mode=setup`);
-        } else {
-          // 非首次登录，需要验证2FA
-          console.log('Redirecting to 2FA verification page');
-          navigate(`/2fa-verify?username=${values.username}`);
-        }
-      } else {
-        console.log('Login failed');
-        message.error('用户名或密码错误');
       }
     } catch (error) {
       console.error('登录时出错:', error);

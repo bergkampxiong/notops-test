@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Typography, Space, Steps } from 'antd';
+import { Form, Input, Button, Card, message, Typography, Space, Steps, Spin } from 'antd';
 import { SafetyOutlined, KeyOutlined, QrcodeOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
-import api from '../services/auth';
+import request from '../utils/request';
 
 const { Title, Paragraph, Text } = Typography;
 const { Step } = Steps;
@@ -13,44 +13,38 @@ const TwoFactorVerify: React.FC = () => {
   const [totpData, setTotpData] = useState<any>(null);
   const [username, setUsername] = useState('');
   const [currentStep, setCurrentStep] = useState(0);
+  const [totpCode, setTotpCode] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    // 从URL参数中获取用户名和模式
     const params = new URLSearchParams(location.search);
     const user = params.get('username');
     const mode = params.get('mode');
     
-    console.log('TwoFactorVerify params:', { user, mode });
-    
     if (user) {
       setUsername(user);
       if (mode === 'setup') {
-        console.log('Setup mode detected, setting up TOTP for user:', user);
+        setCurrentStep(0);
         setSetupMode(true);
         setupTOTP(user);
       } else {
-        console.log('Verification mode detected for user:', user);
+        setCurrentStep(1);
       }
     } else {
-      // 如果没有用户名，重定向到登录页
-      console.log('No username provided, redirecting to login');
+      message.error('缺少用户名参数');
       navigate('/login');
     }
   }, [location, navigate]);
 
-  // 设置TOTP
   const setupTOTP = async (user: string) => {
     setLoading(true);
     try {
-      console.log('Setting up TOTP for user:', user);
-      const response = await api.post('/auth/totp-setup-for-user', {
+      const response = await request.post('auth/totp-setup-for-user', {
         username: user
       });
-      console.log('TOTP setup response:', response.data);
       setTotpData(response.data);
-      setCurrentStep(1); // 移动到扫描二维码步骤
+      setCurrentStep(1);
     } catch (error) {
       console.error('设置TOTP失败:', error);
       message.error('设置TOTP失败，请重试');
@@ -60,46 +54,32 @@ const TwoFactorVerify: React.FC = () => {
     }
   };
 
-  // 验证TOTP
-  const verifyTOTP = async (values: { totp_code: string }) => {
+  const handleVerify = async () => {
     setLoading(true);
     try {
-      console.log('Verifying TOTP for user:', username, 'code:', values.totp_code);
-      const response = await api.post('/auth/totp-verify', {
-        totp_code: values.totp_code,
-        username: username
+      const response = await request.post('auth/totp-verify', {
+        username,
+        totp_code: totpCode
       });
       
-      console.log('TOTP verification response:', response.data);
-      
-      if (response.data.access_token) {
-        if (setupMode) {
-          // 如果是设置模式，验证成功后显示完成步骤，然后返回登录页面
-          setCurrentStep(2); // 移动到完成步骤
-          message.success('双因素认证设置成功，请重新登录');
-          // 3秒后返回登录页
-          setTimeout(() => {
-            navigate('/');
-          }, 3000);
-        } else {
-          // 如果是验证模式，验证成功后直接登录
-          localStorage.setItem('token', response.data.access_token);
-          localStorage.setItem('username', username);
-          message.success('验证成功');
-          navigate('/');
+      if (response.status === 200) {
+        const { access_token, refresh_token } = response.data;
+        localStorage.setItem('token', access_token);
+        if (refresh_token) {
+          localStorage.setItem('refresh_token', refresh_token);
         }
-      } else {
-        message.error('验证失败，请重试');
+        localStorage.setItem('username', username);
+        message.success('验证成功');
+        navigate('/');
       }
     } catch (error) {
       console.error('验证失败:', error);
-      message.error('验证失败，请重试');
+      message.error('验证码错误，请重试');
     } finally {
       setLoading(false);
     }
   };
 
-  // 复制到剪贴板
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).then(
       () => {
@@ -111,7 +91,6 @@ const TwoFactorVerify: React.FC = () => {
     );
   };
 
-  // 设置模式下的步骤内容
   const steps = [
     {
       title: '准备',
@@ -137,7 +116,7 @@ const TwoFactorVerify: React.FC = () => {
             <>
               <div style={{ textAlign: 'center', margin: '20px 0' }}>
                 <img 
-                  src={`/api/auth/totp-qrcode?uri=${encodeURIComponent(totpData.uri)}`} 
+                  src={`auth/totp-qrcode?uri=${encodeURIComponent(totpData.uri)}`} 
                   alt="TOTP QR Code" 
                   style={{ maxWidth: '100%', border: '1px solid #f0f0f0', padding: 8 }}
                 />
@@ -176,7 +155,7 @@ const TwoFactorVerify: React.FC = () => {
               </Paragraph>
               
               <Form
-                onFinish={verifyTOTP}
+                onFinish={handleVerify}
                 layout="vertical"
               >
                 <Form.Item
@@ -193,6 +172,7 @@ const TwoFactorVerify: React.FC = () => {
                     maxLength={6}
                     size="large"
                     style={{ width: '100%' }}
+                    onChange={(e) => setTotpCode(e.target.value)}
                   />
                 </Form.Item>
                 
@@ -260,7 +240,7 @@ const TwoFactorVerify: React.FC = () => {
             </Paragraph>
             
             <Form
-              onFinish={verifyTOTP}
+              onFinish={handleVerify}
               layout="vertical"
             >
               <Form.Item
@@ -276,6 +256,7 @@ const TwoFactorVerify: React.FC = () => {
                   maxLength={6}
                   size="large"
                   style={{ width: '100%' }}
+                  onChange={(e) => setTotpCode(e.target.value)}
                 />
               </Form.Item>
               
@@ -292,14 +273,6 @@ const TwoFactorVerify: React.FC = () => {
                 </Button>
               </Form.Item>
               
-              <div style={{ textAlign: 'center' }}>
-                <Button 
-                  type="link" 
-                  onClick={() => navigate('/login')}
-                >
-                  返回登录
-                </Button>
-              </div>
             </Form>
           </>
         )}

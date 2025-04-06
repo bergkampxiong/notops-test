@@ -5,7 +5,7 @@ import {
   DesktopOutlined, GlobalOutlined, AmazonOutlined, 
   AliyunOutlined, LoadingOutlined
 } from '@ant-design/icons';
-import axios from 'axios';
+import request from '../../utils/request';
 import './Discovery.css';
 
 const { Title, Text } = Typography;
@@ -154,7 +154,7 @@ const CMDBDiscovery: React.FC = () => {
       };
       
       // 发送设备发现请求
-      const response = await axios.post('/api/cmdb/discovery', discoveryParams);
+      const response = await request.post('/api/cmdb/discovery', discoveryParams);
       
       if (response.data.success) {
         message.success(`成功发现 ${response.data.discovered_count || 0} 台设备`);

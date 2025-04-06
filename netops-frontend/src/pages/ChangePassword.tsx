@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Form, Input, Button, Card, message, Alert, Typography } from 'antd';
 import { LockOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { changePassword } from '../services/auth';
+import request from '../utils/request';
 
 const { Title, Text } = Typography;
 
@@ -17,12 +17,17 @@ const ChangePassword: React.FC = () => {
     setError(null);
     
     try {
-      await changePassword(values.oldPassword, values.newPassword);
-      message.success('密码修改成功');
-      navigate('/');
-    } catch (err: any) {
-      console.error('修改密码失败:', err);
-      setError(err.response?.data?.detail || '修改密码失败，请重试');
+      await request.post('/auth/change-password', values);
+      message.success('密码修改成功，请重新登录');
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      navigate('/login');
+    } catch (error: any) {
+      if (error.response?.data?.detail) {
+        message.error(error.response.data.detail);
+      } else {
+        message.error('密码修改失败');
+      }
     } finally {
       setLoading(false);
     }
