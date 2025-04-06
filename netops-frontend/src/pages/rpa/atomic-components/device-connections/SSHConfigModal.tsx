@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Form, Input, Select, InputNumber, Switch, Row, Col, message, Spin } from 'antd';
 import { Typography } from 'antd';
 import { getDeviceTypes, createSSHConfig, updateSSHConfig } from '../../../../services/sshConfig';
-import { getPoolConfig } from '../../../../services/poolConfig';
 import request from '../../../../utils/request';
 import { getCredentials, Credential } from '../../../../services/credential';
 
@@ -32,7 +31,6 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
 }) => {
   const [form] = Form.useForm();                    // 表单实例
   const [deviceTypes, setDeviceTypes] = useState<string[]>([]);  // 设备类型列表
-  const [poolConfigs, setPoolConfigs] = useState<any[]>([]);     // 连接池配置列表
   const [credentials, setCredentials] = useState<Credential[]>([]); // 凭证列表
   const [loading, setLoading] = useState(false);    // 加载状态
   const [selectedDeviceType, setSelectedDeviceType] = useState<string>('');  // 用于控制enable密码字段的显示
@@ -51,22 +49,6 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
       }
     };
     fetchDeviceTypes();
-  }, []);
-
-  /**
-   * 获取连接池配置列表
-   * 在组件挂载时调用
-   */
-  useEffect(() => {
-    const fetchPoolConfigs = async () => {
-      try {
-        const config = await getPoolConfig();
-        setPoolConfigs([config]); // 由于目前只有一个连接池配置，所以直接使用数组
-      } catch (error) {
-        message.error('获取连接池配置失败');
-      }
-    };
-    fetchPoolConfigs();
   }, []);
 
   /**
@@ -140,7 +122,6 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
           initialValues={{
             ...initialValues,
             port: initialValues?.port || 22,
-            pool_config_id: initialValues?.pool_config_id,
             // Netmiko默认参数
             global_delay_factor: initialValues?.global_delay_factor || 1,
             auth_timeout: initialValues?.auth_timeout || 20,
@@ -228,26 +209,6 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
               </Col>
             </Row>
           )}
-
-          {/* 连接池配置部分 */}
-          <Row gutter={24}>
-            <Col span={24}>
-              <Form.Item
-                name="pool_config_id"
-                label="连接池配置"
-                rules={[{ required: true, message: '请选择连接池配置' }]}
-                tooltip="选择用于管理连接的连接池配置"
-              >
-                <Select placeholder="请选择连接池配置">
-                  {poolConfigs.map((config) => (
-                    <Option key={config.id} value={config.id}>
-                      连接池配置 {config.id}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
 
           {/* Netmiko连接参数部分 */}
           <div style={{ marginBottom: 16, fontWeight: 'bold' }}>Netmiko连接参数</div>

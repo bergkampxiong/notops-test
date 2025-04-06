@@ -31,7 +31,7 @@ const PoolMonitor: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    const timer = setInterval(fetchData, 30000); // 每30秒更新一次
+    const timer = setInterval(fetchData, 60000); // 每1分钟更新一次
     return () => clearInterval(timer);
   }, [timeRange]);
 
@@ -123,23 +123,43 @@ const PoolMonitor: React.FC = () => {
             <Row gutter={[16, 16]}>
               <Col span={8}>
                 <Statistic
-                  title="连接错误数"
-                  value={stats?.connection_errors}
+                  title="总连接数"
+                  value={stats?.total_connections}
                   loading={loading}
                 />
               </Col>
               <Col span={8}>
                 <Statistic
-                  title="平均连接时间(ms)"
-                  value={stats?.avg_connection_time}
+                  title="活动连接数"
+                  value={stats?.active_connections}
                   loading={loading}
                 />
               </Col>
               <Col span={8}>
                 <Statistic
-                  title="资源使用率"
-                  value={stats?.resource_usage?.cpu}
-                  suffix="%"
+                  title="空闲连接数"
+                  value={stats?.idle_connections}
+                  loading={loading}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="等待连接数"
+                  value={stats?.waiting_connections}
+                  loading={loading}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="最大等待时间(ms)"
+                  value={stats?.max_wait_time}
+                  loading={loading}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="平均等待时间(ms)"
+                  value={stats?.avg_wait_time}
                   loading={loading}
                 />
               </Col>

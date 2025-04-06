@@ -13,9 +13,7 @@ import {
 } from '@ant-design/icons';
 import type { TabsProps } from 'antd';
 import { getSSHConfigs, deleteSSHConfig, SSHConfig, getDeviceTypes, createSSHConfig, updateSSHConfig } from '../../services/sshConfig';
-import { getPoolConfig, PoolConfig } from '../../services/poolConfig';
 import SSHConfigModal from './atomic-components/device-connections/SSHConfigModal';
-import PoolConfigModal from './atomic-components/device-connections/PoolConfigModal';
 import PoolMonitor from './atomic-components/device-connections/PoolMonitor';
 import SSHCodeViewer from './atomic-components/device-connections/SSHCodeViewer';
 
@@ -41,12 +39,10 @@ const authTypes = [
 
 const DeviceConnections: React.FC = () => {
   // 状态管理
-  const [poolConfig, setPoolConfig] = useState<PoolConfig | null>(null);
   const [activeTab, setActiveTab] = useState('ssh');
   const [sshConfigs, setSSHConfigs] = useState<SSHConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [sshModalVisible, setSSHModalVisible] = useState(false);
-  const [poolConfigModalVisible, setPoolConfigModalVisible] = useState(false);
   const [editingConfig, setEditingConfig] = useState<any>(null);
   const [codeViewerVisible, setCodeViewerVisible] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<SSHConfig | null>(null);
@@ -58,12 +54,8 @@ const DeviceConnections: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [sshData, poolData] = await Promise.all([
-        getSSHConfigs(),
-        getPoolConfig()
-      ]);
+      const sshData = await getSSHConfigs();
       setSSHConfigs(sshData);
-      setPoolConfig(poolData);
     } catch (error) {
       message.error('获取数据失败');
     } finally {
@@ -94,10 +86,6 @@ const DeviceConnections: React.FC = () => {
     } catch (error) {
       message.error('删除SSH配置失败');
     }
-  };
-
-  const handleEditPoolConfig = () => {
-    setPoolConfigModalVisible(true);
   };
 
   // SSH配置表格列定义
@@ -177,11 +165,6 @@ const DeviceConnections: React.FC = () => {
       label: '连接池管理',
       children: (
         <div>
-          <Space style={{ marginBottom: 16 }}>
-            <Button type="primary" onClick={handleEditPoolConfig}>
-              连接池配置
-            </Button>
-          </Space>
           <PoolMonitor />
         </div>
       ),
@@ -195,26 +178,10 @@ const DeviceConnections: React.FC = () => {
         <Tabs activeKey={activeTab} onChange={setActiveTab} items={items} />
       </Card>
 
-      {poolConfig && (
-        <PoolConfigModal
-          visible={poolConfigModalVisible}
-          onCancel={() => setPoolConfigModalVisible(false)}
-          onSuccess={() => {
-            setPoolConfigModalVisible(false);
-            fetchData();
-          }}
-          initialValues={poolConfig}
-        />
-      )}
-
-      {/* 添加代码查看器 */}
       {selectedConfig && (
         <SSHCodeViewer
           visible={codeViewerVisible}
-          onClose={() => {
-            setCodeViewerVisible(false);
-            setSelectedConfig(null);
-          }}
+          onClose={() => setCodeViewerVisible(false)}
           config={selectedConfig}
         />
       )}

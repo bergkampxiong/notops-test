@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, message, Popconfirm, Tabs } from 'antd';
+import React, { useState, useEffect, Suspense } from 'react';
+import { Card, Table, Button, Space, message, Popconfirm, Tabs, Spin } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CodeOutlined } from '@ant-design/icons';
 import SSHConfigModal from './SSHConfigModal';
-import PoolMonitor from './PoolMonitor';
 import SSHCodeViewer from './SSHCodeViewer';
 import { getSSHConfigs, deleteSSHConfig, SSHConfig } from '../../../../services/sshConfig';
 
 const { TabPane } = Tabs;
+
+// 懒加载PoolMonitor组件
+const PoolMonitor = React.lazy(() => import('./PoolMonitor'));
 
 const DeviceConnections: React.FC = () => {
   const [sshConfigs, setSSHConfigs] = useState<SSHConfig[]>([]);
@@ -156,7 +158,19 @@ const DeviceConnections: React.FC = () => {
         </Card>
       </TabPane>
       <TabPane tab="连接池监控" key="2">
-        <PoolMonitor />
+        <Suspense fallback={<div style={{ textAlign: 'center', padding: '20px' }}><Spin /></div>}>
+          <PoolMonitor />
+        </Suspense>
+      </TabPane>
+      <TabPane tab="状态刷新" key="3">
+        <Card title="状态刷新">
+          <div>
+            <p><strong>最大连接数:</strong> 50</p>
+            <p><strong>最小空闲连接数:</strong> 1</p>
+            <p><strong>空闲超时时间:</strong> 300秒</p>
+            <p><strong>连接超时时间:</strong> 30秒</p>
+          </div>
+        </Card>
       </TabPane>
     </Tabs>
   );

@@ -211,9 +211,9 @@ async def get_connection_pools(
     if not pool:
         # 如果没有找到连接池，创建一个默认的
         pool = DeviceConnectionPool(
-            connection_id=connection.id,
+            connection_id=connection.id,  # 使用实际的connection.id
             max_connections=5,
-            min_idle=1,
+            min_idle=1,  # 使用min_idle而不是min_connections
             idle_timeout=300,
             connection_timeout=30,
             description="默认连接池配置",
@@ -222,7 +222,20 @@ async def get_connection_pools(
         db.add(pool)
         db.commit()
         db.refresh(pool)
-    return pool
+    
+    # 确保返回的数据格式正确
+    return {
+        "id": pool.id,
+        "connection_id": pool.connection_id,
+        "max_connections": pool.max_connections,
+        "min_idle": pool.min_idle,  # 使用min_idle
+        "idle_timeout": pool.idle_timeout,
+        "connection_timeout": pool.connection_timeout,
+        "description": pool.description,
+        "created_at": pool.created_at,
+        "updated_at": pool.updated_at,
+        "is_active": pool.is_active
+    }
 
 @router.post("/pools", response_model=DeviceConnectionPoolResponse, status_code=status.HTTP_201_CREATED)
 async def create_connection_pool(
