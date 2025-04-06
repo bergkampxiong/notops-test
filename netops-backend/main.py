@@ -32,7 +32,7 @@ app = FastAPI(title="NetOps API", version="1.0.0")
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 允许所有来源，生产环境应该设置具体的域名
+    allow_origins=["http://172.18.40.99", "http://172.19.33.110"],  # 允许特定的来源
     allow_credentials=True,
     allow_methods=["*"],  # 允许所有方法
     allow_headers=["*"],  # 允许所有请求头

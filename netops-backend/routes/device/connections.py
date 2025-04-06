@@ -199,15 +199,12 @@ async def get_connection_status(
     host: str,
     db: Session = Depends(get_db)
 ):
-    """获取特定连接的状态"""
+    """获取连接状态"""
     try:
-        status = device_connection_manager.get_connection_status(connection_id, host)
-        return {
-            "pool_id": connection_id,
-            "host": host,
-            "status": status.value,
-            "last_checked": datetime.now()
-        }
+        status = await device_connection_manager.get_connection_status(db, connection_id, host)
+        return status
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取连接状态失败: {str(e)}")
 

@@ -62,11 +62,7 @@ export const getFullCredential = async (id: number): Promise<FullCredential> => 
 export const getCredentials = async (): Promise<Credential[]> => {
   try {
     console.log('正在获取凭证列表...');
-    const response = await request.get('device/credential', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    const response = await request.get('device/credential/');
     console.log('凭证列表获取成功:', response.data);
     return response.data;
   } catch (error) {
