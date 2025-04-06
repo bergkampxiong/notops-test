@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
 import json
+from sqlalchemy.exc import SQLAlchemyError
 
 from database.cmdb_session import get_cmdb_db, CMDBBase, cmdb_engine
 from database.cmdb_models import (
@@ -12,7 +13,12 @@ from database.cmdb_models import (
 )
 
 # 创建数据库表
-CMDBBase.metadata.create_all(bind=cmdb_engine)
+try:
+    CMDBBase.metadata.create_all(bind=cmdb_engine)
+    print("CMDB数据库表创建成功")
+except SQLAlchemyError as e:
+    print(f"CMDB数据库表创建失败: {str(e)}")
+    # 不抛出异常，让应用继续运行，因为表可能已经存在
 
 router = APIRouter(
     prefix="/cmdb",
@@ -22,96 +28,103 @@ router = APIRouter(
 
 # 初始化基础数据
 def init_base_data(db: Session):
-    # 检查是否已有数据
-    if db.query(DeviceType).count() == 0:
-        # 添加设备类型
-        device_types = [
-            {"name": "Router", "description": "Network router device"},
-            {"name": "Switch", "description": "Network switch device"},
-            {"name": "Firewall", "description": "Network security device"},
-            {"name": "Server", "description": "Physical server"},
-            {"name": "Virtual Machine", "description": "Virtual server"},
-            {"name": "K8s Cluster", "description": "Kubernetes cluster"}
-        ]
-        for dt in device_types:
-            now = datetime.utcnow().isoformat()
-            db.add(DeviceType(
-                name=dt["name"], 
-                description=dt["description"],
-                created_at=now,
-                updated_at=now
-            ))
-        
-        # 添加厂商
-        vendors = [
-            {"name": "Huawei", "description": "Huawei Technologies"},
-            {"name": "H3C", "description": "H3C Technologies"},
-            {"name": "Ruijie", "description": "Ruijie Networks"},
-            {"name": "Cisco", "description": "Cisco Systems"},
-            {"name": "Fortinet", "description": "Fortinet Security"},
-            {"name": "Palo Alto", "description": "Palo Alto Networks"},
-            {"name": "Dell", "description": "Dell Technologies"},
-            {"name": "HPE", "description": "Hewlett Packard Enterprise"},
-            {"name": "Lenovo", "description": "Lenovo Group Limited"}
-        ]
-        for v in vendors:
-            now = datetime.utcnow().isoformat()
-            db.add(Vendor(
-                name=v["name"], 
-                description=v["description"],
-                created_at=now,
-                updated_at=now
-            ))
-        
-        # 添加位置
-        locations = [
-            {"name": "Beijing DC", "address": "Beijing, China", "description": "Beijing Data Center"},
-            {"name": "Shanghai DC", "address": "Shanghai, China", "description": "Shanghai Data Center"},
-            {"name": "Guangzhou DC", "address": "Guangzhou, China", "description": "Guangzhou Data Center"}
-        ]
-        for loc in locations:
-            now = datetime.utcnow().isoformat()
-            db.add(Location(
-                name=loc["name"], 
-                address=loc["address"],
-                description=loc["description"],
-                created_at=now,
-                updated_at=now
-            ))
-        
-        # 添加部门
-        departments = [
-            {"name": "IT", "description": "IT Department"},
-            {"name": "Finance", "description": "Finance Department"},
-            {"name": "HR", "description": "Human Resources"},
-            {"name": "R&D", "description": "Research and Development"}
-        ]
-        for dept in departments:
-            now = datetime.utcnow().isoformat()
-            db.add(Department(
-                name=dept["name"], 
-                description=dept["description"],
-                created_at=now,
-                updated_at=now
-            ))
-        
-        # 添加资产状态
-        statuses = [
-            {"name": "In Use", "description": "Asset is currently in use"},
-            {"name": "In Stock", "description": "Asset is in stock"},
-            {"name": "Under Maintenance", "description": "Asset is under maintenance"},
-            {"name": "Retired", "description": "Asset is retired"}
-        ]
-        for status in statuses:
-            now = datetime.utcnow().isoformat()
-            db.add(AssetStatus(
-                name=status["name"], 
-                description=status["description"],
-                created_at=now,
-                updated_at=now
-            ))
-        
-        db.commit()
+    try:
+        # 检查是否已有数据
+        if db.query(DeviceType).count() == 0:
+            # 添加设备类型
+            device_types = [
+                {"name": "Router", "description": "Network router device"},
+                {"name": "Switch", "description": "Network switch device"},
+                {"name": "Firewall", "description": "Network security device"},
+                {"name": "Server", "description": "Physical server"},
+                {"name": "Virtual Machine", "description": "Virtual server"},
+                {"name": "K8s Cluster", "description": "Kubernetes cluster"}
+            ]
+            for dt in device_types:
+                now = datetime.utcnow().isoformat()
+                db.add(DeviceType(
+                    name=dt["name"], 
+                    description=dt["description"],
+                    created_at=now,
+                    updated_at=now
+                ))
+            
+            # 添加厂商
+            vendors = [
+                {"name": "Cisco", "description": "Cisco Systems"},
+                {"name": "Huawei", "description": "Huawei Technologies"},
+                {"name": "H3C", "description": "H3C Technologies"},
+                {"name": "Dell", "description": "Dell Technologies"},
+                {"name": "HP", "description": "Hewlett Packard"}
+            ]
+            for vendor in vendors:
+                now = datetime.utcnow().isoformat()
+                db.add(Vendor(
+                    name=vendor["name"],
+                    description=vendor["description"],
+                    created_at=now,
+                    updated_at=now
+                ))
+            
+            # 添加位置
+            locations = [
+                {"name": "Headquarters", "description": "Company headquarters"},
+                {"name": "Data Center 1", "description": "Primary data center"},
+                {"name": "Data Center 2", "description": "Secondary data center"},
+                {"name": "Branch Office 1", "description": "Main branch office"},
+                {"name": "Branch Office 2", "description": "Secondary branch office"}
+            ]
+            for loc in locations:
+                now = datetime.utcnow().isoformat()
+                db.add(Location(
+                    name=loc["name"],
+                    description=loc["description"],
+                    created_at=now,
+                    updated_at=now
+                ))
+            
+            # 添加部门
+            departments = [
+                {"name": "IT", "description": "Information Technology"},
+                {"name": "Network", "description": "Network Operations"},
+                {"name": "Security", "description": "Security Operations"},
+                {"name": "Development", "description": "Software Development"},
+                {"name": "Operations", "description": "System Operations"}
+            ]
+            for dept in departments:
+                now = datetime.utcnow().isoformat()
+                db.add(Department(
+                    name=dept["name"],
+                    description=dept["description"],
+                    created_at=now,
+                    updated_at=now
+                ))
+            
+            # 添加资产状态
+            statuses = [
+                {"name": "In Use", "description": "Asset is currently in use"},
+                {"name": "In Stock", "description": "Asset is in stock"},
+                {"name": "Under Maintenance", "description": "Asset is under maintenance"},
+                {"name": "Retired", "description": "Asset is retired"}
+            ]
+            for status in statuses:
+                now = datetime.utcnow().isoformat()
+                db.add(AssetStatus(
+                    name=status["name"],
+                    description=status["description"],
+                    created_at=now,
+                    updated_at=now
+                ))
+            
+            db.commit()
+            print("CMDB基础数据初始化成功")
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(f"CMDB基础数据初始化失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"数据库操作失败: {str(e)}"
+        )
 
 # 设备类型API
 @router.get("/device-types", response_model=List[dict])

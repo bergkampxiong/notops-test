@@ -47,11 +47,28 @@ proxy.on('proxyReq', (proxyReq, req, res) => {
     req.url = `/api${req.url}`;
   }
   
+  // 获取客户端真实IP
+  let clientIp = req.headers['x-real-ip'] || 
+                 req.headers['x-forwarded-for']?.split(',')[0] || 
+                 req.connection.remoteAddress || 
+                 req.socket.remoteAddress;
+  
+  // 如果是IPv6格式的本地地址，转换为IPv4
+  if (clientIp === '::1' || clientIp === '::ffff:127.0.0.1') {
+    clientIp = '127.0.0.1';
+  }
+  
+  // 添加X-Forwarded-For和X-Real-IP头
+  proxyReq.setHeader('X-Forwarded-For', clientIp);
+  proxyReq.setHeader('X-Real-IP', clientIp);
+  
   const targetUrl = `http://172.18.40.99:8000${req.url}`;
   console.log('转发请求:', {
     originalUrl: req.url,
     targetUrl: targetUrl,
-    method: req.method
+    method: req.method,
+    clientIp: clientIp,
+    headers: req.headers
   });
 });
 

@@ -49,6 +49,7 @@ interface AuditLog {
   ip_address: string;
   timestamp: string;
   details: string;
+  success: boolean;
 }
 
 const AuditLogs: React.FC = () => {
@@ -171,13 +172,14 @@ const AuditLogs: React.FC = () => {
     },
     {
       title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: string) => (
-        <Tag color={status === 'success' ? 'green' : 'red'}>
-          {status === 'success' ? '成功' : '失败'}
-        </Tag>
-      ),
+      dataIndex: 'success',
+      key: 'success',
+      render: (success: boolean) => {
+        // 根据success值返回对应的标签
+        const color = success ? 'green' : 'red';
+        const text = success ? '成功' : '失败';
+        return <Tag color={color}>{text}</Tag>;
+      },
     },
     {
       title: 'IP地址',
@@ -218,7 +220,7 @@ const AuditLogs: React.FC = () => {
             <Card>
               <Statistic
                 title="成功操作"
-                value={logs ? logs.filter(log => log.status === 'success').length : 0}
+                value={logs ? logs.filter(log => log.success).length : 0}
                 prefix={<SafetyOutlined />}
               />
             </Card>
@@ -227,7 +229,7 @@ const AuditLogs: React.FC = () => {
             <Card>
               <Statistic
                 title="失败操作"
-                value={logs ? logs.filter(log => log.status === 'failed').length : 0}
+                value={logs ? logs.filter(log => !log.success).length : 0}
                 prefix={<SafetyOutlined />}
               />
             </Card>
@@ -287,7 +289,7 @@ const AuditLogs: React.FC = () => {
               <p><strong>用户：</strong>{selectedLog.username}</p>
               <p><strong>操作：</strong>{selectedLog.action}</p>
               <p><strong>资源：</strong>{selectedLog.resource}</p>
-              <p><strong>状态：</strong>{selectedLog.status}</p>
+              <p><strong>状态：</strong>{selectedLog.success ? '成功' : '失败'}</p>
               <p><strong>IP地址：</strong>{selectedLog.ip_address}</p>
               <p><strong>详细信息：</strong></p>
               <pre>{JSON.stringify(selectedLog.details, null, 2)}</pre>

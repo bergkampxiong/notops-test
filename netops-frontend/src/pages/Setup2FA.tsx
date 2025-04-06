@@ -86,7 +86,7 @@ const Setup2FA: React.FC = () => {
         password: '******' // 隐藏密码
       });
       
-      const loginResponse = await request.post('/api/auth/login', formData, {
+      const loginResponse = await request.post('/auth/login', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         }
@@ -157,15 +157,15 @@ const Setup2FA: React.FC = () => {
       // 根据用户是否已登录选择不同的API端点
       if (isLoggedIn && token) {
         // 已登录用户使用/auth/totp-setup端点
-        console.log('Using /api/auth/totp-setup endpoint for logged in user');
-        response = await request.post('/api/auth/totp-setup', {}, {
+        console.log('Using /auth/totp-setup endpoint for logged in user');
+        response = await request.post('/auth/totp-setup', {}, {
           headers: {
             'Content-Type': 'application/json'
           }
         });
       } else {
         // 未登录用户或首次设置2FA的用户使用/auth/totp-setup-for-user端点
-        console.log('Using /api/auth/totp-setup-for-user endpoint for user:', user);
+        console.log('Using /auth/totp-setup-for-user endpoint for user:', user);
         
         // 使用URLSearchParams格式发送请求
         const formData = new URLSearchParams();
@@ -173,7 +173,7 @@ const Setup2FA: React.FC = () => {
         
         console.log('Sending request with form data:', formData.toString());
         
-        response = await request.post('/api/auth/totp-setup-for-user', formData, {
+        response = await request.post('/auth/totp-setup-for-user', formData, {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           }
@@ -196,7 +196,7 @@ const Setup2FA: React.FC = () => {
     setLoading(true);
     try {
       console.log('Verifying TOTP for user:', username, 'code:', values.totp_code);
-      const response = await request.post('/api/auth/totp-verify', {
+      const response = await request.post('/auth/totp-verify', {
         totp_code: values.totp_code,
         username: username
       });

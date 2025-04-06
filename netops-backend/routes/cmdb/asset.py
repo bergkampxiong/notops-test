@@ -222,21 +222,22 @@ def get_asset_statistics(
 
 @router.post("/assets/import", response_model=ImportResponse, tags=["CMDB资产"])
 async def import_assets_from_csv(
-    request: dict,
+    file: UploadFile = File(...),
     db: Session = Depends(get_cmdb_db),
 ):
-    """从CSV内容导入资产数据"""
-    if 'content' not in request:
-        raise HTTPException(status_code=400, detail="缺少CSV内容")
-    
+    """从CSV文件导入资产数据"""
     # 处理CSV数据
     imported_count = 0
     failed_count = 0
     errors = []
     
     try:
+        # 读取上传的文件内容
+        content = await file.read()
+        content_str = content.decode('utf-8')
+        
         # 解析CSV内容
-        csv_reader = csv.DictReader(io.StringIO(request['content']))
+        csv_reader = csv.DictReader(io.StringIO(content_str))
         
         # 获取设备类型、厂商、状态和系统类型的映射
         device_types = {dt.name: dt.id for dt in db.query(DeviceTypeModel).all()}

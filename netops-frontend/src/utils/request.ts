@@ -17,6 +17,7 @@ interface CustomAxiosInstance extends Omit<AxiosInstance, 'get' | 'delete' | 'po
   post<T = any>(url: string, data?: any, config?: any): Promise<StandardResponse<T>>;
   put<T = any>(url: string, data?: any, config?: any): Promise<StandardResponse<T>>;
   patch<T = any>(url: string, data?: any, config?: any): Promise<StandardResponse<T>>;
+  (config: any): Promise<any>;  // 添加request方法的类型定义
 }
 
 // 创建axios实例
@@ -72,12 +73,49 @@ request.interceptors.response.use(
     (response as any).standardResponse = standardResponse;
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // 如果是401错误且不是刷新令牌的请求
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes('/auth/refresh')) {
+      originalRequest._retry = true;
+      
+      try {
+        // 获取刷新令牌
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (!refreshToken) {
+          throw new Error('No refresh token available');
+        }
+        
+        // 尝试刷新令牌
+        const response = await request.post('/auth/refresh', { refresh_token: refreshToken });
+        
+        if (response.status === 200) {
+          // 更新访问令牌
+          const newToken = response.data.access_token;
+          localStorage.setItem('token', newToken);
+          
+          // 更新原始请求的Authorization头
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          
+          // 重试原始请求
+          return request(originalRequest);
+        }
+      } catch (refreshError) {
+        // 刷新令牌失败，清除所有令牌并跳转到登录页
+        localStorage.removeItem('token');
+        localStorage.removeItem('refresh_token');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    
     if (error.response) {
       switch (error.response.status) {
         case 401:
           // 未授权，清除token并跳转到登录页
           localStorage.removeItem('token');
+          localStorage.removeItem('refresh_token');
           window.location.href = '/login';
           break;
         case 403:

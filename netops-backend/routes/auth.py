@@ -16,6 +16,22 @@ from auth.audit import log_event
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
+def get_client_ip(request: Request) -> str:
+    """获取客户端真实IP地址"""
+    # 优先使用X-Forwarded-For头
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # 取第一个IP（最原始的客户端IP）
+        return forwarded_for.split(",")[0].strip()
+    
+    # 其次使用X-Real-IP头
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip
+    
+    # 最后使用客户端IP
+    return request.client.host
+
 @router.post("/login", response_model=Token)
 async def login_for_access_token(
     request: Request,
@@ -26,6 +42,9 @@ async def login_for_access_token(
     # 获取用户
     user = db.query(User).filter(User.username == form_data.username).first()
     
+    # 获取客户端IP
+    client_ip = get_client_ip(request)
+    
     # 检查用户是否被锁定
     if user and user.locked_until:
         lock_time = datetime.fromisoformat(user.locked_until)
@@ -34,7 +53,7 @@ async def login_for_access_token(
                 db=db,
                 event_type="login",
                 user=user,
-                ip_address=request.client.host,
+                ip_address=client_ip,
                 user_agent=request.headers.get("user-agent"),
                 success=False,
                 details={"reason": "Account locked"}
@@ -66,7 +85,7 @@ async def login_for_access_token(
                     db=db,
                     event_type="account_locked",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=client_ip,
                     user_agent=request.headers.get("user-agent"),
                     success=True,
                     details={"reason": "5 failed login attempts", "locked_until": user.locked_until}
@@ -78,7 +97,7 @@ async def login_for_access_token(
             db=db,
             event_type="login",
             username=form_data.username,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Invalid credentials"}
@@ -101,7 +120,7 @@ async def login_for_access_token(
             db=db,
             event_type="login_2fa_required",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -113,7 +132,7 @@ async def login_for_access_token(
             db=db,
             event_type="login_2fa_setup_required",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -138,7 +157,7 @@ async def login_for_access_token(
         db=db,
         event_type="login",
         user=user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -165,7 +184,7 @@ async def ldap_login(
             db=db,
             event_type="ldap_login",
             username=username,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": error}
@@ -183,7 +202,7 @@ async def ldap_login(
             db=db,
             event_type="ldap_login_2fa_required",
             user=user,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -202,7 +221,7 @@ async def ldap_login(
         db=db,
         event_type="ldap_login",
         user=user,
-        ip_address=request.client.host,
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -227,7 +246,7 @@ async def logout(
         db=db,
         event_type="logout",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -252,7 +271,7 @@ async def setup_totp_endpoint(
         db=db,
         event_type="totp_setup",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -292,7 +311,7 @@ async def verify_totp_endpoint(
                 db=db,
                 event_type="totp_verify",
                 user=user,
-                ip_address=request.client.host,
+                ip_address=get_client_ip(request),
                 user_agent=request.headers.get("user-agent"),
                 success=False,
                 details={"reason": "Invalid TOTP code"}
@@ -309,7 +328,7 @@ async def verify_totp_endpoint(
                 db=db,
                 event_type="totp_enabled",
                 user=user,
-                ip_address=request.client.host,
+                ip_address=get_client_ip(request),
                 user_agent=request.headers.get("user-agent"),
                 success=True
             )
@@ -331,7 +350,7 @@ async def verify_totp_endpoint(
             db=db,
             event_type="totp_verify",
             user=user,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -356,7 +375,7 @@ async def verify_totp_endpoint(
                     db=db,
                     event_type="totp_verify",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=get_client_ip(request),
                     user_agent=request.headers.get("user-agent"),
                     success=False,
                     details={"error": str(e)}
@@ -374,13 +393,16 @@ async def refresh_access_token(
     db: Session = Depends(get_db)
 ):
     """刷新访问令牌"""
+    # 获取客户端IP
+    client_ip = get_client_ip(request)
+    
     user = verify_refresh_token(refresh_token, db)
     
     if not user:
         log_event(
             db=db,
             event_type="token_refresh",
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Invalid refresh token"}
@@ -397,11 +419,12 @@ async def refresh_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     
+    # 记录成功事件
     log_event(
         db=db,
         event_type="token_refresh",
         user=user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -422,7 +445,7 @@ async def revoke_token(
         db=db,
         event_type="token_revoke",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
         success=success
     )
@@ -445,7 +468,7 @@ async def revoke_all_tokens(
         db=db,
         event_type="token_revoke_all",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=get_client_ip(request),
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"count": count}
@@ -507,7 +530,7 @@ async def setup_totp_for_user(
             db=db,
             event_type="totp_setup",
             user=user,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -527,7 +550,7 @@ async def setup_totp_for_user(
                     db=db,
                     event_type="totp_setup",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=get_client_ip(request),
                     user_agent=request.headers.get("user-agent"),
                     success=False,
                     details={"error": str(e)}
@@ -567,7 +590,7 @@ async def direct_totp_setup(
             db=db,
             event_type="totp_setup",
             user=user,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -587,7 +610,7 @@ async def direct_totp_setup(
                     db=db,
                     event_type="totp_setup",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=get_client_ip(request),
                     user_agent=request.headers.get("user-agent"),
                     success=False,
                     details={"error": str(e)}
