@@ -65,7 +65,7 @@ export const getPoolConfig = async (): Promise<PoolConfig> => {
   
   try {
     console.log('正在获取连接池配置...');
-    const response = await api.get('/api/device/connections/pools');
+    const response = await api.get('/device/connections/pools');
     console.log('连接池配置获取成功:', response.data);
     
     // 确保返回的是数组且非空

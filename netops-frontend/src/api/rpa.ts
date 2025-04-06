@@ -6,11 +6,11 @@ import type { SSHConfig, SSHCredential } from '../types/rpa';
 export const sshConfigApi = {
   // 获取SSH配置列表
   getList: () => {
-    return request.get<ApiResponse<SSHConfig[]>>('/api/rpa/atomic-components/device-connections');
+    return request.get<ApiResponse<SSHConfig[]>>('/rpa/atomic-components/device-connections');
   },
 
   // 获取SSH凭证列表
   getCredentials: () => {
-    return request.get<ApiResponse<SSHCredential[]>>('/api/rpa/atomic-components/device-credentials');
+    return request.get<ApiResponse<SSHCredential[]>>('/rpa/atomic-components/device-credentials');
   }
 }; 

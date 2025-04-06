@@ -3,7 +3,7 @@ import { Modal, Form, Input, Select, InputNumber, Switch, Row, Col, message, Spi
 import { Typography } from 'antd';
 import { getDeviceTypes, createSSHConfig, updateSSHConfig } from '../../../../services/sshConfig';
 import { getPoolConfig } from '../../../../services/poolConfig';
-import { api } from '../../../../utils/api';
+import request from '../../../../utils/request';
 import { getCredentials, Credential } from '../../../../services/credential';
 
 const { Text } = Typography;
@@ -76,12 +76,11 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
   useEffect(() => {
     const fetchCredentials = async () => {
       try {
-        const data = await getCredentials();
-        console.log('获取到的凭证列表:', data);
-        setCredentials(data);
+        const response = await request.get('/device/credential/');
+        setCredentials(response.data);
       } catch (error) {
-        message.error('获取凭证列表失败');
         console.error('获取凭证列表失败:', error);
+        message.error('获取凭证列表失败');
       }
     };
     fetchCredentials();
