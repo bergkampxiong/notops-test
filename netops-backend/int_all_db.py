@@ -235,18 +235,6 @@ def init_credential_tables(engine):
         # 创建凭证表
         Credential.__table__.create(engine, checkfirst=True)
         
-        # 检查credential_mgt_credentials表是否存在is_active列
-        inspector = inspect(engine)
-        if 'credential_mgt_credentials' in inspector.get_table_names():
-            columns = [col['name'] for col in inspector.get_columns('credential_mgt_credentials')]
-            if 'is_active' not in columns:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE credential_mgt_credentials ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
-                    conn.commit()
-                print("已添加is_active列到credential_mgt_credentials表")
-            else:
-                print("credential_mgt_credentials表已存在且包含is_active列")
-        
         # 创建默认凭证
         db = sessionmaker(autocommit=False, autoflush=False, bind=engine)()
         try:
@@ -256,9 +244,10 @@ def init_credential_tables(engine):
                 # 创建默认凭证
                 default_credential = Credential(
                     name="默认凭证",
+                    description="默认设备凭证",
+                    credential_type="ssh_password",
                     username="admin",
                     password="admin",
-                    description="默认设备凭证",
                     is_active=True
                 )
                 db.add(default_credential)

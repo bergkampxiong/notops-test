@@ -7,7 +7,10 @@ from auth.authentication import get_current_user
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/device/credential",
+    tags=["credential-management"]
+)
 
 # 凭证基础模型
 class CredentialBase(BaseModel):

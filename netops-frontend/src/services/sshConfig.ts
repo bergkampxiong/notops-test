@@ -85,10 +85,25 @@ export async function getSSHConfigs(): Promise<SSHConfig[]> {
  * @returns Promise<SSHConfig> 新创建的SSH配置
  */
 export async function createSSHConfig(data: SSHConfigCreate): Promise<SSHConfig> {
-  console.log('创建SSH配置，请求数据:', data);
-  const response = await request.post('device/connections/', data);
-  console.log('创建SSH配置成功，响应数据:', response);
-  return response.data;
+  try {
+    console.log('创建SSH配置，请求数据:', data);
+    const response = await request.post('device/connections/', data);
+    console.log('创建SSH配置成功，响应数据:', response);
+    return response.data;
+  } catch (error: any) {
+    console.error('创建SSH配置失败:', error);
+    if (error.response) {
+      // 服务器返回错误
+      const errorMessage = error.response.data?.detail || '创建SSH配置失败';
+      throw new Error(errorMessage);
+    } else if (error.request) {
+      // 请求发送失败
+      throw new Error('无法连接到服务器，请检查网络连接');
+    } else {
+      // 其他错误
+      throw new Error('创建SSH配置时发生未知错误');
+    }
+  }
 }
 
 /**
@@ -107,7 +122,7 @@ export async function updateSSHConfig(id: number, data: Partial<SSHConfigCreate>
  * @param id 要删除的配置ID
  */
 export async function deleteSSHConfig(id: number): Promise<void> {
-  await request.delete(`device/connections/${id}/`);
+  await request.delete(`device/connections/${id}`);
 }
 
 /**

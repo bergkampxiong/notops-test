@@ -58,7 +58,7 @@ app.include_router(audit.router)
 app.include_router(ldap.router)
 app.include_router(security.router, prefix="/api/security")
 app.include_router(cmdb_router, prefix="/api")
-app.include_router(device_router, prefix="/api/device")
+app.include_router(device_router)
 app.include_router(config_management.router, prefix="/api", tags=["config"])
 app.include_router(config_generator_router, prefix="/api/config-generator", tags=["config-generator"])
 

@@ -7,7 +7,7 @@ from .pool_config import router as pool_config_router
 router = APIRouter()
 
 # 包含子路由
-router.include_router(category_router, prefix="/category", tags=["device-category"])
-router.include_router(credential_router, prefix="/credential", tags=["credential-management"])
-router.include_router(connections_router, prefix="/connections", tags=["device-connections"])
+router.include_router(category_router)
+router.include_router(credential_router)
+router.include_router(connections_router)
 router.include_router(pool_config_router, prefix="/connections/pools", tags=["pool-config"]) 

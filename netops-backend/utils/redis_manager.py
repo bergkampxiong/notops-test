@@ -40,7 +40,7 @@ class RedisManager:
                 socket_timeout=5,
                 socket_connect_timeout=5,
                 retry_on_timeout=True,
-                max_connections=50  # 最大连接数
+                max_connections=10  # 修改为更合理的最大连接数
             )
             
             # 创建 Redis 客户端

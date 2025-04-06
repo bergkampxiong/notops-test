@@ -16,7 +16,10 @@ import httpx
 from datetime import datetime
 import asyncio
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/api/device/category",
+    tags=["device-category"]
+)
 
 # 获取所有设备分组
 @router.get("/groups", response_model=List[DeviceGroupSchema])
