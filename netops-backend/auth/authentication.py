@@ -7,6 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import os
 import secrets
+import pytz
 
 # 导入数据库模型和会话
 from database.models import User, RefreshToken
@@ -47,10 +48,11 @@ def authenticate_user(db: Session, username: str, password: str):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """创建访问令牌"""
     to_encode = data.copy()
+    tz = pytz.timezone('Asia/Shanghai')
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(tz) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(tz) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -94,7 +96,8 @@ def create_refresh_token(user_id: int, db: Session):
     token = secrets.token_urlsafe(32)
     
     # 设置过期时间（7天）
-    expires_at = (datetime.utcnow() + timedelta(days=7)).isoformat()
+    tz = pytz.timezone('Asia/Shanghai')
+    expires_at = (datetime.now(tz) + timedelta(days=7)).isoformat()
     
     # 创建刷新令牌记录
     refresh_token = RefreshToken(

@@ -7,6 +7,7 @@ import json
 import random
 import string
 from datetime import datetime, timedelta
+import pytz
 
 from database.models import User, UsedTOTP
 
@@ -89,7 +90,8 @@ def verify_totp(user: User, totp_code: str, db: Session):
     
     if valid:
         # 记录已使用的TOTP码
-        now = datetime.utcnow()
+        tz = pytz.timezone('Asia/Shanghai')
+        now = datetime.now(tz)
         used_totp = UsedTOTP(
             user_id=user.id,
             totp_code=totp_code,

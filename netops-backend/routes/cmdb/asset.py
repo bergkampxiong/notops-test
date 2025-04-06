@@ -259,16 +259,46 @@ async def import_assets_from_csv(
                 device_type_name = row['设备类型']
                 device_type_id = device_types.get(device_type_name)
                 if not device_type_id:
-                    new_device_type = DeviceTypeModel(
-                        name=device_type_name,
-                        description=f"从CSV导入创建的设备类型: {device_type_name}",
-                        created_at=datetime.now().isoformat(),
-                        updated_at=datetime.now().isoformat()
-                    )
-                    db.add(new_device_type)
-                    db.flush()
-                    device_type_id = new_device_type.id
-                    device_types[device_type_name] = device_type_id
+                    # 检查是否存在相似的中文设备类型
+                    existing_device_type = db.query(DeviceTypeModel).filter(
+                        DeviceTypeModel.name == device_type_name
+                    ).first()
+                    
+                    if existing_device_type:
+                        device_type_id = existing_device_type.id
+                        device_types[device_type_name] = device_type_id
+                    else:
+                        # 检查是否是英文设备类型的重复
+                        english_types = ['Server', 'Network', 'K8S Node', 'K8S Cluster']
+                        if device_type_name in english_types:
+                            # 查找对应的中文设备类型
+                            chinese_mapping = {
+                                'Server': '服务器',
+                                'Network': '网络设备',
+                                'K8S Node': 'K8S节点',
+                                'K8S Cluster': 'K8S集群'
+                            }
+                            chinese_name = chinese_mapping.get(device_type_name)
+                            if chinese_name:
+                                existing_chinese_type = db.query(DeviceTypeModel).filter(
+                                    DeviceTypeModel.name == chinese_name
+                                ).first()
+                                if existing_chinese_type:
+                                    device_type_id = existing_chinese_type.id
+                                    device_types[device_type_name] = device_type_id
+                                    continue
+                        
+                        # 如果都不存在，创建新的设备类型
+                        new_device_type = DeviceTypeModel(
+                            name=device_type_name,
+                            description=f"从CSV导入创建的设备类型: {device_type_name}",
+                            created_at=datetime.now().isoformat(),
+                            updated_at=datetime.now().isoformat()
+                        )
+                        db.add(new_device_type)
+                        db.flush()
+                        device_type_id = new_device_type.id
+                        device_types[device_type_name] = device_type_id
                 
                 # 获取或创建厂商
                 vendor_name = row.get('厂商')
@@ -514,12 +544,3 @@ def get_locations(
     """获取所有位置"""
     locations = db.query(LocationModel).all()
     return [{"id": l.id, "name": l.name, "description": l.description} for l in locations]
-
-# 获取系统类型列表
-@router.get("/system-types", response_model=List[Dict], tags=["CMDB资产"])
-def get_system_types(
-    db: Session = Depends(get_cmdb_db),
-):
-    """获取所有系统类型"""
-    system_types = db.query(SystemTypeModel).all()
-    return [{"id": st.id, "name": st.name, "description": st.description} for st in system_types]

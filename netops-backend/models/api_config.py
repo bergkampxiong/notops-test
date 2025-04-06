@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime
 from database.base import Base
 import datetime
+import pytz
 
 class ApiConfig(Base):
     __tablename__ = "api_configs"
@@ -11,7 +12,7 @@ class ApiConfig(Base):
     method = Column(String, nullable=False)
     headers = Column(String)
     body = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')))
     created_by = Column(String, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')), onupdate=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')))
     updated_by = Column(String, nullable=False) 

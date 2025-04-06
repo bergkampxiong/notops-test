@@ -48,7 +48,7 @@ const CMDBModelManage: React.FC = () => {
   const fetchModelData = async (modelType: string) => {
     setLoading(true);
     try {
-      const response = await request.get(`/api/cmdb/${modelType}`);
+      const response = await request.get(`/cmdb/${modelType}`);
       setModelData(response.data);
     } catch (error) {
       console.error(`获取${getModelTypeName(modelType)}数据失败:`, error);
@@ -120,7 +120,7 @@ const CMDBModelManage: React.FC = () => {
     }
     
     try {
-      await request.put(`/api/cmdb/${activeTab}/${editingItem.id}`, values);
+      await request.put(`/cmdb/${activeTab}/${editingItem.id}`, values);
       message.success('更新成功');
       setEditingItem(null);
       fetchModelData(activeTab);
@@ -132,7 +132,7 @@ const CMDBModelManage: React.FC = () => {
   // 处理添加
   const handleAdd = async (values: any) => {
     try {
-      await request.post(`/api/cmdb/${activeTab}`, values);
+      await request.post(`/cmdb/${activeTab}`, values);
       message.success('添加成功');
       setModalVisible(false);
       fetchModelData(activeTab);
@@ -144,7 +144,7 @@ const CMDBModelManage: React.FC = () => {
   // 处理删除
   const handleDelete = async (id: number) => {
     try {
-      await request.delete(`/api/cmdb/${activeTab}/${id}`);
+      await request.delete(`/cmdb/${activeTab}/${id}`);
       message.success('删除成功');
       fetchModelData(activeTab);
     } catch (error) {

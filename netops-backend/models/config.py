@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, UniqueCons
 from sqlalchemy.orm import relationship
 from database.base import Base
 import datetime
+import pytz
 
 class ConfigFile(Base):
     __tablename__ = "config_files"
@@ -10,9 +11,9 @@ class ConfigFile(Base):
     name = Column(String, nullable=False)
     device_type = Column(String, nullable=False)
     content = Column(String)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')))
     created_by = Column(String, nullable=False)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')), onupdate=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')))
     updated_by = Column(String, nullable=False)
     
     versions = relationship("ConfigVersion", back_populates="config", cascade="all, delete-orphan")
@@ -24,7 +25,7 @@ class ConfigVersion(Base):
     config_id = Column(String, ForeignKey("config_files.id"), nullable=False)
     version = Column(Integer, nullable=False)
     content = Column(String, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.datetime.now(pytz.timezone('Asia/Shanghai')))
     created_by = Column(String, nullable=False)
     
     config = relationship("ConfigFile", back_populates="versions")

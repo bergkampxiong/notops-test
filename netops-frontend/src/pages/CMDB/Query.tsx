@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, Input, Space, Table, Tag, Typography, message, Row, Upload, Modal, Form, Select, Popconfirm, Col, DatePicker, Alert, Spin } from 'antd';
+import { Button, Card, Input, Space, Table, Tag, Typography, message, Row, Upload, Modal, Form, Select, Popconfirm, Col, DatePicker, Alert, Spin, InputNumber } from 'antd';
 import type { InputRef } from 'antd';
 import type { ColumnType, FilterConfirmProps, FilterDropdownProps } from 'antd/es/table/interface';
 import { 
@@ -89,7 +89,7 @@ const CMDBQuery: React.FC = () => {
       const [deviceTypesRes, vendorsRes, statusesRes, locationsRes] = await Promise.all([
         request.get('/cmdb/device-types'),
         request.get('/cmdb/vendors'),
-        request.get('/cmdb/statuses'),
+        request.get('/cmdb/asset-statuses'),
         request.get('/cmdb/locations')
       ]);
       
@@ -434,12 +434,22 @@ const CMDBQuery: React.FC = () => {
     
     setEditDeviceLoading(true);
     try {
-      // 处理日期字段
+      // 处理日期字段和数据类型转换
       const formattedValues = {
         ...values,
+        // 确保ID字段为整数类型
+        device_type_id: values.device_type_id ? parseInt(values.device_type_id) : null,
+        vendor_id: values.vendor_id ? parseInt(values.vendor_id) : null,
+        location_id: values.location_id ? parseInt(values.location_id) : null,
+        status_id: values.status_id ? parseInt(values.status_id) : null,
+        system_type_id: values.system_type_id ? parseInt(values.system_type_id) : null,
+        // 处理日期字段
         purchase_date: values.purchase_date ? values.purchase_date.format('YYYY-MM-DD') : null,
         online_date: values.online_date ? values.online_date.format('YYYY-MM-DD') : null,
         warranty_expiry: values.warranty_expiry ? values.warranty_expiry.format('YYYY-MM-DD') : null,
+        // 处理数值字段
+        purchase_cost: values.purchase_cost ? parseFloat(values.purchase_cost) : null,
+        current_value: values.current_value ? parseFloat(values.current_value) : null,
       };
       
       await request.put(`/cmdb/assets/${currentDevice.id}`, formattedValues);
@@ -1281,7 +1291,7 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
           setCurrentDevice(null);
         }}
         footer={null}
-        width={800}
+        width={1200}
         styles={{
           body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }
         }}
@@ -1291,7 +1301,7 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
           layout="vertical"
           onFinish={handleEditDevice}
         >
-          <Row gutter={16}>
+          <Row gutter={[24, 24]}>
             <Col span={8}>
               <Form.Item
                 name="name"
@@ -1320,8 +1330,8 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
               </Form.Item>
             </Col>
           </Row>
-          
-          <Row gutter={16}>
+
+          <Row gutter={[24, 24]}>
             <Col span={8}>
               <Form.Item
                 name="device_type_id"
@@ -1329,8 +1339,8 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
                 rules={[{ required: true, message: '请选择设备类型' }]}
               >
                 <Select placeholder="请选择设备类型">
-                  {deviceTypeOptions.map(type => (
-                    <Option key={type.id} value={type.id}>{type.name}</Option>
+                  {deviceTypeOptions.map(option => (
+                    <Option key={option.id} value={option.id}>{option.name}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -1340,30 +1350,11 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
                 name="vendor_id"
                 label="厂商"
               >
-                <Select placeholder="请选择厂商" allowClear>
-                  {vendorOptions.map(vendor => (
-                    <Option key={vendor.id} value={vendor.id}>{vendor.name}</Option>
+                <Select placeholder="请选择厂商">
+                  {vendorOptions.map(option => (
+                    <Option key={option.id} value={option.id}>{option.name}</Option>
                   ))}
                 </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="model"
-                label="型号"
-              >
-                <Input placeholder="请输入设备型号" />
-              </Form.Item>
-            </Col>
-          </Row>
-          
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="serial_number"
-                label="序列号"
-              >
-                <Input placeholder="请输入序列号" />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -1379,29 +1370,29 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
                 </Select>
               </Form.Item>
             </Col>
+          </Row>
+
+          <Row gutter={[24, 24]}>
+            <Col span={8}>
+              <Form.Item
+                name="location_id"
+                label="位置"
+              >
+                <Select placeholder="请选择位置">
+                  {locationOptions.map(option => (
+                    <Option key={option.id} value={option.id}>{option.name}</Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
             <Col span={8}>
               <Form.Item
                 name="status_id"
                 label="状态"
               >
                 <Select placeholder="请选择状态">
-                  {statusOptions.map(status => (
-                    <Option key={status.id} value={status.id}>{status.name}</Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-          </Row>
-          
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                name="location_id"
-                label="位置"
-              >
-                <Select placeholder="请选择位置" allowClear>
-                  {locationOptions.map(location => (
-                    <Option key={location.id} value={location.id}>{location.name}</Option>
+                  {statusOptions.map(option => (
+                    <Option key={option.id} value={option.id}>{option.name}</Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -1414,36 +1405,42 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
                 <Input placeholder="请输入所有者" />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item
-                name="department_id"
-                label="所属部门"
-              >
-                <Select placeholder="请选择部门" allowClear>
-                  {/* 这里需要添加部门选项，如果后端有提供部门API */}
-                  <Option value={1}>IT部门</Option>
-                  <Option value={2}>研发部门</Option>
-                  <Option value={3}>运维部门</Option>
-                </Select>
-              </Form.Item>
-            </Col>
           </Row>
-          
-          <Row gutter={16}>
+
+          <Row gutter={[24, 24]}>
             <Col span={8}>
               <Form.Item
                 name="purchase_date"
                 label="购买日期"
               >
-                <DatePicker style={{ width: '100%' }} placeholder="选择购买日期" />
+                <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
+            <Col span={8}>
+              <Form.Item
+                name="purchase_cost"
+                label="购买成本"
+              >
+                <InputNumber style={{ width: '100%' }} placeholder="请输入购买成本" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="current_value"
+                label="当前价值"
+              >
+                <InputNumber style={{ width: '100%' }} placeholder="请输入当前价值" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={[24, 24]}>
             <Col span={8}>
               <Form.Item
                 name="online_date"
                 label="上线时间"
               >
-                <DatePicker style={{ width: '100%' }} placeholder="选择上线时间" />
+                <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -1451,37 +1448,30 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
                 name="warranty_expiry"
                 label="保修到期"
               >
-                <DatePicker style={{ width: '100%' }} placeholder="选择保修到期日期" />
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="serial_number"
+                label="SN码"
+              >
+                <Input placeholder="请输入SN码" />
               </Form.Item>
             </Col>
           </Row>
-          
-          <Row gutter={16}>
-            <Col span={12}>
+
+          <Row gutter={[24, 24]}>
+            <Col span={24}>
               <Form.Item
-                name="purchase_cost"
-                label="购买成本"
+                name="notes"
+                label="备注"
               >
-                <Input prefix="¥" placeholder="请输入购买成本" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="current_value"
-                label="当前价值"
-              >
-                <Input prefix="¥" placeholder="请输入当前价值" />
+                <Input.TextArea rows={4} placeholder="请输入备注信息" />
               </Form.Item>
             </Col>
           </Row>
-          
-          <Form.Item
-            name="notes"
-            label="备注"
-          >
-            <Input.TextArea rows={4} placeholder="请输入备注信息" />
-          </Form.Item>
-          
+
           <Form.Item>
             <Row justify="end">
               <Space>

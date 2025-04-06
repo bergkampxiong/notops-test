@@ -15,7 +15,8 @@ from database.config import get_database_url
 from database.base import Base
 from database.cmdb_models import (
     CMDBBase, DeviceType, Vendor, Location, Department, 
-    AssetStatus, Asset, NetworkDevice, Server, VirtualMachine, K8sCluster
+    AssetStatus, Asset, NetworkDevice, Server, VirtualMachine, K8sCluster,
+    SystemType
 )
 from database.models import User, UsedTOTP, RefreshToken
 from database.category_models import Base as CategoryBase
@@ -47,8 +48,48 @@ def init_system_data(db):
             db.add(admin)
             db.commit()
             print("系统管理员用户创建成功")
+            
+        # 初始化系统类型
+        init_system_types(db)
+            
     except Exception as e:
         print(f"系统数据初始化失败: {str(e)}")
+        db.rollback()
+        raise
+
+def init_system_types(db):
+    """初始化系统类型数据"""
+    try:
+        # 默认系统类型列表
+        default_system_types = [
+            "ruijie_os",
+            "hp_comware",
+            "huawei_vrpv8",
+            "linux",
+            "cisco_ios",
+            "cisco_nxos",
+            "cisco_xe",
+            "cisco_xr",
+            "paloalto_panos",
+            "fortinet"
+        ]
+        
+        # 检查并添加默认系统类型
+        for system_type_name in default_system_types:
+            existing_type = db.query(SystemType).filter(SystemType.name == system_type_name).first()
+            if not existing_type:
+                new_system_type = SystemType(
+                    name=system_type_name,
+                    description=f"默认系统类型: {system_type_name}",
+                    created_at=datetime.now().isoformat(),
+                    updated_at=datetime.now().isoformat()
+                )
+                db.add(new_system_type)
+        
+        db.commit()
+        print("系统类型初始化成功")
+    except Exception as e:
+        print(f"系统类型初始化失败: {str(e)}")
         db.rollback()
         raise
 

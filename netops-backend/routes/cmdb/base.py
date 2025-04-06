@@ -398,6 +398,35 @@ def get_system_types(
     db: Session = Depends(get_cmdb_db),
 ):
     """获取系统类型列表"""
+    # 默认系统类型列表
+    default_system_types = [
+        "ruijie_os",
+        "hp_comware",
+        "huawei_vrpv8",
+        "linux",
+        "cisco_ios",
+        "cisco_nxos",
+        "cisco_xe",
+        "cisco_xr",
+        "paloalto_panos",
+        "fortinet"
+    ]
+    
+    # 检查并添加默认系统类型
+    for system_type_name in default_system_types:
+        existing_type = db.query(SystemTypeModel).filter(SystemTypeModel.name == system_type_name).first()
+        if not existing_type:
+            new_system_type = SystemTypeModel(
+                name=system_type_name,
+                description=f"默认系统类型: {system_type_name}",
+                created_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat()
+            )
+            db.add(new_system_type)
+    
+    db.commit()
+    
+    # 获取所有系统类型
     system_types = db.query(SystemTypeModel).offset(skip).limit(limit).all()
     return system_types
 

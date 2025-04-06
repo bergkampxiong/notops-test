@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
+import pytz
 
 from database.models import User
 from auth.authentication import get_password_hash
@@ -7,6 +8,7 @@ from schemas.user import UserCreate
 
 def create_user(db: Session, user: UserCreate):
     """创建用户"""
+    tz = pytz.timezone('Asia/Shanghai')
     db_user = User(
         username=user.username,
         email=user.email,
@@ -16,7 +18,7 @@ def create_user(db: Session, user: UserCreate):
         role=user.role if user.role else "Operator",
         department=user.department,
         totp_enabled=user.totp_enabled if user.totp_enabled is not None else False,
-        password_changed_at=datetime.utcnow().isoformat()
+        password_changed_at=datetime.now(tz).isoformat()
     )
     
     db.add(db_user)
