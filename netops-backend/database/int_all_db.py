@@ -1,17 +1,15 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 import os
 import sys
 from datetime import datetime
 from passlib.context import CryptContext
-from sqlalchemy.sql import text
-from sqlalchemy import inspect
-from database.session import SessionLocal, engine
-from database.device_connection_models import DeviceConnection, DeviceConnectionPool, DeviceConnectionStats
 
 # 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 
 # 导入数据库配置和模型
 from database.config import get_database_url
@@ -21,13 +19,16 @@ from database.cmdb_models import (
     AssetStatus, Asset, NetworkDevice, Server, VirtualMachine, K8sCluster,
     SystemType
 )
-from database.models import User, UsedTOTP, RefreshToken
+from database.models import User, UsedTOTP, RefreshToken, Credential
 from database.category_models import Base as CategoryBase
 from database.config_management_models import Base as ConfigBase
+from database.device_connection_models import DeviceConnection, DeviceConnectionPool, DeviceConnectionStats
+
+# 获取数据库URL
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/netops")
 
 # 创建密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 def get_password_hash(password):
     """生成密码哈希"""
     return pwd_context.hash(password)
@@ -193,95 +194,112 @@ def init_cmdb_data(db):
         db.rollback()
         raise
 
-def init_device_connection_tables(engine):
-    """初始化设备连接管理模块的表"""
+def init_credential_tables(db):
+    """初始化凭证相关的表"""
     try:
-        print("正在创建设备连接管理模块的表...")
+        # 检查表是否存在
+        result = db.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'credentials'
+            );
+        """))
+        table_exists = result.scalar()
         
-        # 创建设备连接管理模块的表
-        DeviceConnection.__table__.create(engine, checkfirst=True)
-        DeviceConnectionPool.__table__.create(engine, checkfirst=True)
-        DeviceConnectionStats.__table__.create(engine, checkfirst=True)
-        
-        # 检查device_connections表是否存在description和is_active列
-        inspector = inspect(engine)
-        if 'device_connections' in inspector.get_table_names():
-            columns = [col['name'] for col in inspector.get_columns('device_connections')]
-            if 'description' not in columns:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE device_connections ADD COLUMN description TEXT"))
-                    conn.commit()
-                print("已添加description列到device_connections表")
-            else:
-                print("device_connections表已存在且包含description列")
-                
-            if 'is_active' not in columns:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE device_connections ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
-                    conn.commit()
-                print("已添加is_active列到device_connections表")
-            else:
-                print("device_connections表已存在且包含is_active列")
-        
-        # 检查device_connection_pools表是否存在description列
-        if 'device_connection_pools' in inspector.get_table_names():
-            columns = [col['name'] for col in inspector.get_columns('device_connection_pools')]
-            if 'description' not in columns:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE device_connection_pools ADD COLUMN description TEXT"))
-                    conn.commit()
-                print("已添加description列到device_connection_pools表")
-            else:
-                print("device_connection_pools表已存在且包含description列")
-        
-        # 创建默认连接池
-        db = SessionLocal()
-        try:
-            # 检查是否已存在默认连接池
-            default_pool = db.query(DeviceConnectionPool).first()
-            if not default_pool:
-                # 创建默认连接配置
-                default_connection = DeviceConnection(
-                    name="默认连接配置",
-                    device_type="cisco_ios",
-                    credential_id=1,
-                    port=22,
-                    description="系统默认连接配置",
-                    is_active=True
-                )
-                db.add(default_connection)
-                db.commit()
-                
-                # 创建默认连接池
-                default_pool = DeviceConnectionPool(
-                    connection_id=default_connection.id,
-                    max_connections=5,
-                    min_connections=1,
-                    idle_timeout=300,
-                    connection_timeout=30,
-                    description="默认连接池",
-                    is_active=True
-                )
-                db.add(default_pool)
-                db.commit()
-                print("已创建默认连接池")
-            else:
-                print("默认连接池已存在")
-        except Exception as e:
-            db.rollback()
-            print(f"创建默认连接池失败: {str(e)}")
-        finally:
-            db.close()
-        
-        print("设备连接管理模块的表创建完成")
+        if not table_exists:
+            # 创建表
+            Credential.__table__.create(db.get_bind())
+            print("凭证表创建成功")
+            
+            # 创建默认凭证
+            credential = Credential(
+                name="默认凭证",
+                username="admin",
+                password="admin",
+                description="默认设备凭证",
+                is_active=True
+            )
+            db.add(credential)
+            db.commit()
+            print("默认凭证创建成功")
+        else:
+            print("凭证表已存在")
     except Exception as e:
-        print(f"创建设备连接管理模块的表失败: {str(e)}")
+        print(f"凭证表初始化失败: {str(e)}")
+        db.rollback()
+        raise
+
+def init_device_connection_tables(db):
+    """初始化设备连接相关的表"""
+    try:
+        # 检查表是否存在
+        result = db.execute(text("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'device_connection_pools'
+            );
+        """))
+        table_exists = result.scalar()
+        
+        if not table_exists:
+            # 创建表
+            DeviceConnectionPool.__table__.create(db.get_bind())
+            print("设备连接池表创建成功")
+        else:
+            # 检查并添加必要的列
+            columns_to_check = [
+                ("description", "TEXT"),
+                ("min_idle", "INTEGER DEFAULT 1"),
+                ("max_idle", "INTEGER DEFAULT 3"),
+                ("max_lifetime", "INTEGER DEFAULT 3600")
+            ]
+            
+            for column_name, column_type in columns_to_check:
+                result = db.execute(text(f"""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.columns 
+                        WHERE table_name = 'device_connection_pools' 
+                        AND column_name = '{column_name}'
+                    );
+                """))
+                column_exists = result.scalar()
+                
+                if not column_exists:
+                    # 添加列
+                    db.execute(text(f"""
+                        ALTER TABLE device_connection_pools 
+                        ADD COLUMN {column_name} {column_type};
+                    """))
+                    db.commit()
+                    print(f"设备连接池表添加{column_name}列成功")
+            
+            # 检查是否需要重命名min_connections为min_idle
+            result = db.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns 
+                    WHERE table_name = 'device_connection_pools' 
+                    AND column_name = 'min_connections'
+                );
+            """))
+            min_connections_exists = result.scalar()
+            
+            if min_connections_exists:
+                # 重命名列
+                db.execute(text("""
+                    ALTER TABLE device_connection_pools 
+                    RENAME COLUMN min_connections TO min_idle;
+                """))
+                db.commit()
+                print("设备连接池表重命名min_connections列为min_idle成功")
+            
+            print("设备连接池表结构更新完成")
+    except Exception as e:
+        print(f"设备连接表初始化失败: {str(e)}")
+        db.rollback()
         raise
 
 def init_databases():
     """初始化所有数据库"""
-    print("开始初始化数据库...")
-    
     try:
         # 创建主数据库引擎
         main_engine = create_engine(
@@ -293,9 +311,19 @@ def init_databases():
         )
         main_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=main_engine)
         
+        # 创建CMDB数据库引擎
+        cmdb_engine = create_engine(
+            get_database_url("cmdb"),
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=30,
+            pool_recycle=1800
+        )
+        cmdb_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=cmdb_engine)
+        
         # 创建CMDB schema
         print("正在创建CMDB schema...")
-        with main_engine.connect() as conn:
+        with cmdb_engine.connect() as conn:
             conn.execute(text("CREATE SCHEMA IF NOT EXISTS cmdb"))
             conn.commit()
         print("CMDB schema创建成功")
@@ -306,7 +334,7 @@ def init_databases():
         print("主数据库表创建成功")
         
         print("正在创建CMDB数据库表...")
-        CMDBBase.metadata.create_all(bind=main_engine)
+        CMDBBase.metadata.create_all(bind=cmdb_engine)
         print("CMDB数据库表创建成功")
         
         print("正在创建设备分类数据库表...")
@@ -327,15 +355,27 @@ def init_databases():
         
         # 初始化CMDB数据
         print("正在初始化CMDB数据...")
-        db = main_SessionLocal()  # 使用主数据库会话
+        db = cmdb_SessionLocal()
         try:
             init_cmdb_data(db)
         finally:
             db.close()
-        
-        # 初始化设备连接管理模块的表
-        print("正在初始化设备连接管理模块的表...")
-        init_device_connection_tables(main_engine)
+            
+        # 初始化凭证表
+        print("正在初始化凭证表...")
+        db = main_SessionLocal()
+        try:
+            init_credential_tables(db)
+        finally:
+            db.close()
+            
+        # 初始化设备连接表
+        print("正在初始化设备连接表...")
+        db = main_SessionLocal()
+        try:
+            init_device_connection_tables(db)
+        finally:
+            db.close()
         
         print("所有数据库初始化完成")
         

@@ -1,61 +1,87 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from database.device_connection_models import SSHConnection, ConnectionPool, ConnectionStats
+from database.device_connection_models import DeviceConnection, DeviceConnectionPool, DeviceConnectionStats
 from database.session import get_db
-from utils.connection_manager import connection_manager
 from pydantic import BaseModel
 from datetime import datetime
+from utils.device_connection_manager import device_connection_manager, ConnectionStatus
+from database.credential_models import Credential
 
 router = APIRouter(
     prefix="",
     tags=["device-connections"]
 )
 
-class SSHConnectionBase(BaseModel):
-    """SSH连接基础模型"""
+class DeviceConnectionBase(BaseModel):
+    """设备连接基础模型"""
     name: str
-    credential_id: str
+    device_type: str
+    credential_id: int
     port: int = 22
+    enable_secret: Optional[str] = None
+    global_delay_factor: float = 1.0
+    auth_timeout: int = 60
+    banner_timeout: int = 20
+    fast_cli: bool = False
+    session_timeout: int = 60
+    conn_timeout: int = 20
+    keepalive: int = 20
+    verbose: bool = False
     description: Optional[str] = None
 
-class SSHConnectionCreate(SSHConnectionBase):
+class DeviceConnectionCreate(DeviceConnectionBase):
     pass
 
-class SSHConnectionUpdate(SSHConnectionBase):
+class DeviceConnectionUpdate(DeviceConnectionBase):
     pass
 
-class SSHConnectionResponse(SSHConnectionBase):
+class DeviceConnectionResponse(DeviceConnectionBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    is_active: bool
 
     class Config:
         orm_mode = True
 
-class ConnectionPoolBase(BaseModel):
-    """连接池基础模型"""
-    name: str
-    ssh_config_id: int
-    max_connections: int = 10
+class DeviceConnectionPoolBase(BaseModel):
+    """设备连接池基础模型"""
+    connection_id: int
+    max_connections: int = 5
+    min_idle: int = 1
+    idle_timeout: int = 300
+    connection_timeout: int = 30
     description: Optional[str] = None
+    is_active: bool = True
 
-class ConnectionPoolCreate(ConnectionPoolBase):
+class DeviceConnectionPoolCreate(DeviceConnectionPoolBase):
     pass
 
-class ConnectionPoolUpdate(ConnectionPoolBase):
+class DeviceConnectionPoolUpdate(DeviceConnectionPoolBase):
     pass
 
-class ConnectionPoolResponse(ConnectionPoolBase):
+class DeviceConnectionPoolResponse(BaseModel):
+    """设备连接池响应模型"""
     id: int
-    created_at: datetime
-    updated_at: datetime
+    connection_id: int
+    max_connections: int = 5
+    min_idle: int = 1
+    idle_timeout: int = 300
+    connection_timeout: int = 30
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    is_active: bool = True
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
-class ConnectionStatsResponse(BaseModel):
-    """连接统计响应模型"""
+class DeviceConnectionStatsResponse(BaseModel):
+    """设备连接统计响应模型"""
     pool_id: int
     current_connections: int
     total_connections: int
@@ -65,49 +91,62 @@ class ConnectionStatsResponse(BaseModel):
     class Config:
         orm_mode = True
 
-@router.get("/", response_model=List[SSHConnectionResponse])
-async def get_ssh_connections(
+class ConnectionStatusResponse(BaseModel):
+    """连接状态响应模型"""
+    pool_id: int
+    host: str
+    status: str
+    last_checked: datetime
+
+@router.get("/", response_model=List[DeviceConnectionResponse])
+async def get_device_connections(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    """获取SSH连接配置列表"""
-    connections = db.query(SSHConnection).offset(skip).limit(limit).all()
-    return connections
+    """获取设备连接配置列表"""
+    try:
+        connections = db.query(DeviceConnection).offset(skip).limit(limit).all()
+        return connections
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取设备连接配置列表失败: {str(e)}"
+        )
 
-@router.post("/", response_model=SSHConnectionResponse, status_code=status.HTTP_201_CREATED)
-async def create_ssh_connection(
-    connection: SSHConnectionCreate,
+@router.post("/", response_model=DeviceConnectionResponse, status_code=status.HTTP_201_CREATED)
+async def create_device_connection(
+    connection: DeviceConnectionCreate,
     db: Session = Depends(get_db)
 ):
-    """创建新的SSH连接配置"""
-    db_connection = SSHConnection(**connection.model_dump())
+    """创建新的设备连接配置"""
+    db_connection = DeviceConnection(**connection.model_dump())
     db.add(db_connection)
     db.commit()
     db.refresh(db_connection)
     return db_connection
 
-@router.get("/{connection_id}", response_model=SSHConnectionResponse)
-async def get_ssh_connection(
+@router.get("/{connection_id}", response_model=DeviceConnectionResponse)
+async def get_device_connection(
     connection_id: int,
     db: Session = Depends(get_db)
 ):
-    """获取特定的SSH连接配置"""
-    connection = db.query(SSHConnection).filter(SSHConnection.id == connection_id).first()
+    """获取特定的设备连接配置"""
+    connection = db.query(DeviceConnection).filter(DeviceConnection.id == connection_id).first()
     if not connection:
-        raise HTTPException(status_code=404, detail="SSH连接配置不存在")
+        raise HTTPException(status_code=404, detail="设备连接配置不存在")
     return connection
 
-@router.put("/{connection_id}", response_model=SSHConnectionResponse)
-async def update_ssh_connection(
+@router.put("/{connection_id}", response_model=DeviceConnectionResponse)
+async def update_device_connection(
     connection_id: int,
-    connection: SSHConnectionUpdate,
+    connection: DeviceConnectionUpdate,
     db: Session = Depends(get_db)
 ):
-    """更新SSH连接配置"""
-    db_connection = db.query(SSHConnection).filter(SSHConnection.id == connection_id).first()
+    """更新设备连接配置"""
+    db_connection = db.query(DeviceConnection).filter(DeviceConnection.id == connection_id).first()
     if not db_connection:
-        raise HTTPException(status_code=404, detail="SSH连接配置不存在")
+        raise HTTPException(status_code=404, detail="设备连接配置不存在")
     
     for key, value in connection.model_dump(exclude_unset=True).items():
         setattr(db_connection, key, value)
@@ -117,61 +156,105 @@ async def update_ssh_connection(
     return db_connection
 
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_ssh_connection(
+async def delete_device_connection(
     connection_id: int,
     db: Session = Depends(get_db)
 ):
-    """删除SSH连接配置"""
-    connection = db.query(SSHConnection).filter(SSHConnection.id == connection_id).first()
+    """删除设备连接配置"""
+    connection = db.query(DeviceConnection).filter(DeviceConnection.id == connection_id).first()
     if not connection:
-        raise HTTPException(status_code=404, detail="SSH连接配置不存在")
+        raise HTTPException(status_code=404, detail="设备连接配置不存在")
     
     db.delete(connection)
     db.commit()
     return None
 
 # 连接池相关接口
-@router.get("/pools", response_model=List[ConnectionPoolResponse])
+@router.get("/pools", response_model=DeviceConnectionPoolResponse)
 async def get_connection_pools(
-    skip: int = 0,
-    limit: int = 100,
     db: Session = Depends(get_db)
 ):
-    """获取连接池列表"""
-    pools = db.query(ConnectionPool).offset(skip).limit(limit).all()
-    return pools
+    """获取连接池配置"""
+    # 先检查是否存在凭证
+    credential = db.query(Credential).first()
+    if not credential:
+        # 如果没有凭证，创建一个默认的
+        credential = Credential(
+            name="默认凭证",
+            username="admin",
+            password="admin",
+            description="默认设备凭证",
+            is_active=True
+        )
+        db.add(credential)
+        db.commit()
+        db.refresh(credential)
+    
+    # 检查是否存在设备连接配置
+    connection = db.query(DeviceConnection).first()
+    if not connection:
+        # 如果没有设备连接配置，创建一个默认的
+        connection = DeviceConnection(
+            name="默认连接配置",
+            device_type="cisco_ios",
+            credential_id=credential.id,
+            port=22,
+            description="默认设备连接配置",
+            is_active=True
+        )
+        db.add(connection)
+        db.commit()
+        db.refresh(connection)
+    
+    # 获取或创建连接池
+    pool = db.query(DeviceConnectionPool).first()
+    if not pool:
+        # 如果没有找到连接池，创建一个默认的
+        pool = DeviceConnectionPool(
+            connection_id=connection.id,
+            max_connections=5,
+            min_idle=1,
+            idle_timeout=300,
+            connection_timeout=30,
+            description="默认连接池配置",
+            is_active=True
+        )
+        db.add(pool)
+        db.commit()
+        db.refresh(pool)
+    return pool
 
-@router.post("/pools", response_model=ConnectionPoolResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/pools", response_model=DeviceConnectionPoolResponse, status_code=status.HTTP_201_CREATED)
 async def create_connection_pool(
-    pool: ConnectionPoolCreate,
+    pool: DeviceConnectionPoolCreate,
     db: Session = Depends(get_db)
 ):
     """创建新的连接池"""
-    db_pool = ConnectionPool(**pool.model_dump())
+    db_pool = DeviceConnectionPool(**pool.model_dump())
     db.add(db_pool)
     db.commit()
     db.refresh(db_pool)
     return db_pool
 
-@router.get("/pools/{pool_id}", response_model=ConnectionPoolResponse)
+@router.get("/pools/{pool_id}", response_model=DeviceConnectionPoolResponse)
 async def get_connection_pool(
     pool_id: int,
     db: Session = Depends(get_db)
 ):
     """获取特定的连接池"""
-    pool = db.query(ConnectionPool).filter(ConnectionPool.id == pool_id).first()
+    pool = db.query(DeviceConnectionPool).filter(DeviceConnectionPool.id == pool_id).first()
     if not pool:
         raise HTTPException(status_code=404, detail="连接池不存在")
     return pool
 
-@router.put("/pools/{pool_id}", response_model=ConnectionPoolResponse)
+@router.put("/pools/{pool_id}", response_model=DeviceConnectionPoolResponse)
 async def update_connection_pool(
     pool_id: int,
-    pool: ConnectionPoolUpdate,
+    pool: DeviceConnectionPoolUpdate,
     db: Session = Depends(get_db)
 ):
     """更新连接池配置"""
-    db_pool = db.query(ConnectionPool).filter(ConnectionPool.id == pool_id).first()
+    db_pool = db.query(DeviceConnectionPool).filter(DeviceConnectionPool.id == pool_id).first()
     if not db_pool:
         raise HTTPException(status_code=404, detail="连接池不存在")
     
@@ -188,49 +271,121 @@ async def delete_connection_pool(
     db: Session = Depends(get_db)
 ):
     """删除连接池"""
-    pool = db.query(ConnectionPool).filter(ConnectionPool.id == pool_id).first()
+    pool = db.query(DeviceConnectionPool).filter(DeviceConnectionPool.id == pool_id).first()
     if not pool:
         raise HTTPException(status_code=404, detail="连接池不存在")
-    
-    # 清理连接池中的所有连接
-    await connection_manager.cleanup_pool(db, pool_id)
     
     db.delete(pool)
     db.commit()
     return None
 
-# 连接池统计信息接口
-@router.get("/pools/{pool_id}/stats", response_model=ConnectionStatsResponse)
-async def get_pool_stats(
-    pool_id: int,
-    db: Session = Depends(get_db)
-):
-    """获取连接池统计信息"""
-    stats = db.query(ConnectionStats).filter(ConnectionStats.pool_id == pool_id).first()
-    if not stats:
-        raise HTTPException(status_code=404, detail="连接池统计信息不存在")
-    return stats
-
-@router.get("/pools/{pool_id}/status", response_model=ConnectionStatsResponse)
+@router.get("/pools/{pool_id}/status", response_model=DeviceConnectionStatsResponse)
 async def get_pool_status(
     pool_id: int,
     db: Session = Depends(get_db)
 ):
     """获取连接池状态"""
-    stats = db.query(ConnectionStats).filter(ConnectionStats.pool_id == pool_id).first()
+    stats = db.query(DeviceConnectionStats).filter(DeviceConnectionStats.pool_id == pool_id).first()
     if not stats:
         raise HTTPException(status_code=404, detail="连接池状态不存在")
     return stats
 
+@router.post("/pools/{pool_id}/connect")
+async def connect_to_device(
+    pool_id: int,
+    host: str,
+    db: Session = Depends(get_db)
+):
+    """连接到设备"""
+    try:
+        connection = await device_connection_manager.get_connection(db, pool_id, host)
+        return {"message": "连接成功", "host": host}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"连接失败: {str(e)}")
+
+@router.post("/pools/{pool_id}/disconnect")
+async def disconnect_from_device(
+    pool_id: int,
+    host: str,
+    db: Session = Depends(get_db)
+):
+    """断开设备连接"""
+    try:
+        await device_connection_manager.release_connection(db, pool_id, host, None)
+        return {"message": "断开连接成功", "host": host}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"断开连接失败: {str(e)}")
+
 @router.post("/pools/{pool_id}/cleanup")
-async def cleanup_pool(
+async def cleanup_connection_pool(
     pool_id: int,
     db: Session = Depends(get_db)
 ):
     """清理连接池"""
-    pool = db.query(ConnectionPool).filter(ConnectionPool.id == pool_id).first()
-    if not pool:
-        raise HTTPException(status_code=404, detail="连接池不存在")
-    
-    await connection_manager.cleanup_pool(db, pool_id)
-    return {"message": "连接池已清理"} 
+    try:
+        await device_connection_manager.cleanup_pool(db, pool_id)
+        return {"message": "连接池清理成功"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"清理连接池失败: {str(e)}")
+
+@router.post("/pools/{pool_id}/execute")
+async def execute_command(
+    pool_id: int,
+    host: str,
+    command: str,
+    db: Session = Depends(get_db)
+):
+    """在设备上执行命令"""
+    try:
+        connection = await device_connection_manager.get_connection(db, pool_id, host)
+        try:
+            output = connection.send_command(command)
+            return {"message": "命令执行成功", "output": output}
+        finally:
+            await device_connection_manager.release_connection(db, pool_id, host, connection)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"命令执行失败: {str(e)}")
+
+@router.get("/pools/{pool_id}/connections/{host}/status", response_model=ConnectionStatusResponse)
+async def get_connection_status(
+    pool_id: int,
+    host: str,
+    db: Session = Depends(get_db)
+):
+    """获取特定连接的状态"""
+    try:
+        status = device_connection_manager.get_connection_status(pool_id, host)
+        return {
+            "pool_id": pool_id,
+            "host": host,
+            "status": status.value,
+            "last_checked": datetime.now()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取连接状态失败: {str(e)}")
+
+@router.get("/pools/{pool_id}/connections/status", response_model=List[ConnectionStatusResponse])
+async def get_all_connection_statuses(
+    pool_id: int,
+    db: Session = Depends(get_db)
+):
+    """获取连接池中所有连接的状态"""
+    try:
+        statuses = []
+        for host in device_connection_manager._connection_status.get(pool_id, {}):
+            status = device_connection_manager.get_connection_status(pool_id, host)
+            statuses.append({
+                "pool_id": pool_id,
+                "host": host,
+                "status": status.value,
+                "last_checked": datetime.now()
+            })
+        return statuses
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取连接状态列表失败: {str(e)}") 

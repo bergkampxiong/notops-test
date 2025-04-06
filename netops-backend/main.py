@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 import warnings
 from sqlalchemy import exc as sa_exc
+import asyncio
 
 # 禁用SQLAlchemy的警告
 warnings.filterwarnings('ignore', category=sa_exc.SAWarning)
@@ -21,6 +22,9 @@ import database.config_management_models  # 导入配置管理模型
 from routes import auth, users, audit, ldap, security, config_management, config_generator_router
 from routes.cmdb import router as cmdb_router
 from routes.device import router as device_router
+
+# 导入连接管理器
+from utils.device_connection_manager import device_connection_manager
 
 # 创建应用
 app = FastAPI(title="NetOps API", version="1.0.0")
@@ -87,6 +91,11 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(cleanup_expired_records, 'interval', hours=24)  # 每24小时执行一次
 scheduler.start()
 
+# 应用启动时启动连接管理器
+@app.on_event("startup")
+async def startup_event():
+    await device_connection_manager.start()
+
 # 根路由
 @app.get("/")
 async def root():
@@ -97,9 +106,10 @@ async def root():
 async def health():
     return {"status": "ok"}
 
-# 应用关闭时停止调度器
+# 应用关闭时停止连接管理器
 @app.on_event("shutdown")
-def shutdown_event():
+async def shutdown_event():
+    await device_connection_manager.stop()
     scheduler.shutdown()
 
 @app.get("/favicon.ico", include_in_schema=False)

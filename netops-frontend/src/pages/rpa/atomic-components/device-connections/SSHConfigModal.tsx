@@ -76,7 +76,7 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
   useEffect(() => {
     const fetchCredentials = async () => {
       try {
-        const response = await request.get('/device/credential/');
+        const response = await request.get('device/credential/');
         setCredentials(response.data);
       } catch (error) {
         console.error('获取凭证列表失败:', error);

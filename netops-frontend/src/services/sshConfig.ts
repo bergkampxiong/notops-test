@@ -1,4 +1,4 @@
-import { api } from '../utils/api';
+import request from '../utils/request';
 
 /**
  * SSH配置接口定义
@@ -71,7 +71,7 @@ const deviceTypes = [
 export const getSSHConfigs = async (): Promise<SSHConfig[]> => {
   try {
     console.log('正在获取SSH配置列表...');
-    const response = await api.get('/api/device/connections');
+    const response = await request.get('device/credential/');
     console.log('SSH配置列表获取成功:', response.data);
     return response.data;
   } catch (error) {
@@ -88,7 +88,7 @@ export const getSSHConfigs = async (): Promise<SSHConfig[]> => {
  */
 export const createSSHConfig = async (data: SSHConfigCreate): Promise<SSHConfig> => {
   try {
-    const response = await api.post('/api/device/connections', data);
+    const response = await request.post('device/connections/', data);
     return response.data;
   } catch (error) {
     console.error('创建SSH配置失败:', error);
@@ -104,7 +104,7 @@ export const createSSHConfig = async (data: SSHConfigCreate): Promise<SSHConfig>
  */
 export const updateSSHConfig = async (id: number, data: Partial<SSHConfigCreate>): Promise<SSHConfig> => {
   try {
-    const response = await api.put(`/api/device/connections/${id}`, data);
+    const response = await request.put(`device/connections/${id}/`, data);
     return response.data;
   } catch (error) {
     console.error('更新SSH配置失败:', error);
@@ -118,7 +118,7 @@ export const updateSSHConfig = async (id: number, data: Partial<SSHConfigCreate>
  */
 export const deleteSSHConfig = async (id: number): Promise<void> => {
   try {
-    await api.delete(`/api/device/connections/${id}`);
+    await request.delete(`device/connections/${id}/`);
   } catch (error) {
     console.error('删除SSH配置失败:', error);
     throw error;
@@ -137,7 +137,7 @@ export const getSSHPoolStatus = async (configId: number): Promise<{
   connection_errors: number;     // 连接错误数
 }> => {
   try {
-    const response = await api.get(`/device/connections/pools/${configId}/status`);
+    const response = await request.get(`device/connections/pools/${configId}/status/`);
     return response.data;
   } catch (error) {
     console.error('获取连接池状态失败:', error);
@@ -152,7 +152,7 @@ export const getSSHPoolStatus = async (configId: number): Promise<{
  */
 export const cleanupSSHPool = async (configId: number): Promise<void> => {
   try {
-    await api.post(`/device/connections/pools/${configId}/cleanup`);
+    await request.post(`device/connections/pools/${configId}/cleanup/`);
   } catch (error) {
     console.error('清理连接池失败:', error);
     throw error;
@@ -171,7 +171,7 @@ export const getSSHPoolConfig = async (configId: number): Promise<{
   max_lifetime: number;         // 最大生命周期
 }> => {
   try {
-    const response = await api.get(`/device/connections/pools/${configId}`);
+    const response = await request.get(`device/connections/pools/${configId}/`);
     return response.data;
   } catch (error) {
     console.error('获取连接池配置失败:', error);
@@ -194,7 +194,7 @@ export const updateSSHPoolConfig = async (
   }
 ): Promise<void> => {
   try {
-    await api.put(`/device/connections/pools/${configId}`, data);
+    await request.put(`device/connections/pools/${configId}/`, data);
   } catch (error) {
     console.error('更新连接池配置失败:', error);
     throw error;

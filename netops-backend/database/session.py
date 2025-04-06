@@ -1,6 +1,9 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 from .config import get_database_url
+
+# 创建基类
+Base = declarative_base()
 
 # 创建数据库引擎
 engine = create_engine(get_database_url())

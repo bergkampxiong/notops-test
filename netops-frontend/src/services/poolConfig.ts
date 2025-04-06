@@ -1,15 +1,16 @@
-import { api } from '../utils/api';
+import request from '../utils/request';
 
 export interface PoolConfig {
   id: number;
+  connection_id: number;
   max_connections: number;
-  connection_timeout: number;
+  min_connections: number;
   idle_timeout: number;
-  max_lifetime: number;
-  min_idle: number;
-  max_idle: number;
+  connection_timeout: number;
+  description?: string;
   created_at: string;
   updated_at: string;
+  is_active: boolean;
 }
 
 export interface PoolStats {
@@ -26,6 +27,24 @@ export interface PoolStats {
   };
 }
 
+export interface PoolMetricsResponse {
+  connection_history: Array<{
+    timestamp: string;
+    value: number;
+    type: string;
+  }>;
+  error_history: Array<{
+    timestamp: string;
+    value: number;
+    type: string;
+  }>;
+  resource_usage: Array<{
+    timestamp: string;
+    value: number;
+    type: string;
+  }>;
+}
+
 export interface PoolConfigCreate {
   max_connections: number;
   connection_timeout: number;
@@ -33,16 +52,6 @@ export interface PoolConfigCreate {
   max_lifetime: number;
   min_idle: number;
   max_idle: number;
-}
-
-export interface PoolMetricData {
-  timestamp: string;
-  type: string;
-  value: number;
-}
-
-export interface PoolMetricsResponse {
-  connection_history: PoolMetricData[];
 }
 
 /**
@@ -53,26 +62,27 @@ export const getPoolConfig = async (): Promise<PoolConfig> => {
   // 定义默认连接池配置
   const defaultConfig: PoolConfig = {
     id: 1,
-    max_connections: 100,
-    connection_timeout: 30,
+    connection_id: 0,
+    max_connections: 5,
+    min_connections: 1,
     idle_timeout: 300,
-    max_lifetime: 3600,
-    min_idle: 5,
-    max_idle: 20,
+    connection_timeout: 30,
+    description: "默认连接池配置",
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    is_active: true
   };
   
   try {
     console.log('正在获取连接池配置...');
-    const response = await api.get('/device/connections/pools');
-    console.log('连接池配置获取成功:', response.data);
+    const response = await request.get<PoolConfig>('device/connections/pools');
+    console.log('连接池配置获取成功:', response);
     
-    // 确保返回的是数组且非空
-    if (Array.isArray(response.data) && response.data.length > 0) {
-      return response.data[0];
+    // 如果返回的是对象，直接返回
+    if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+      return response.data;
     } else {
-      console.log('API返回空数组或非数组数据，使用默认配置');
+      console.log('API返回格式不正确，使用默认配置');
       return defaultConfig;
     }
   } catch (error) {
@@ -88,7 +98,7 @@ export const getPoolConfig = async (): Promise<PoolConfig> => {
  */
 export const getPoolStats = async (): Promise<PoolStats> => {
   try {
-    const response = await api.get('/api/device/connections/pools/1/stats');
+    const response = await request.get('device/connections/pools/1/stats');
     return response.data;
   } catch (error) {
     console.error('获取连接池状态失败:', error);
@@ -102,7 +112,7 @@ export const getPoolStats = async (): Promise<PoolStats> => {
  */
 export const cleanupConnections = async (): Promise<void> => {
   try {
-    await api.post('/api/device/connections/pools/1/cleanup');
+    await request.post('device/connections/pools/1/cleanup');
   } catch (error) {
     console.error('清理连接池失败:', error);
     throw error;
@@ -116,7 +126,7 @@ export const cleanupConnections = async (): Promise<void> => {
  */
 export const getPoolMetrics = async (timeRange: string = '1h'): Promise<PoolMetricsResponse> => {
   try {
-    const response = await api.get(`/api/device/connections/pools/1/metrics?time_range=${timeRange}`);
+    const response = await request.get(`device/connections/pools/1/metrics?time_range=${timeRange}`);
     return response.data;
   } catch (error) {
     console.error('获取连接池指标失败:', error);
@@ -132,7 +142,7 @@ export const getPoolMetrics = async (timeRange: string = '1h'): Promise<PoolMetr
  */
 export const updatePoolConfig = async (id: number, data: Partial<PoolConfigCreate>): Promise<PoolConfig> => {
   try {
-    const response = await api.put(`/api/device/connections/pools/${id}`, data);
+    const response = await request.put(`device/connections/pools/${id}`, data);
     return response.data;
   } catch (error) {
     console.error('更新连接池配置失败:', error);
