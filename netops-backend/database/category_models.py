@@ -49,6 +49,7 @@ class Credential(Base):
     credential_type = Column(Enum(CredentialType), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
     
     # 用户名（适用于SSH密码和SSH密钥）
     username = Column(String(100), nullable=True)

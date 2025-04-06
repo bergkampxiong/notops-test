@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select, InputNumber, Switch, Row, Col, message, Spin } from 'antd';
+import { Modal, Form, Input, Select, InputNumber, Switch, Row, Col, message, Spin, Button, Space, Card } from 'antd';
 import { Typography } from 'antd';
 import { getDeviceTypes, createSSHConfig, updateSSHConfig } from '../../../../services/sshConfig';
 import request from '../../../../utils/request';
-import { getCredentials, Credential } from '../../../../services/credential';
+import { getCredentials, getFullCredential, Credential, FullCredential } from '../../../../services/credential';
 
 const { Text } = Typography;
 
@@ -34,6 +34,7 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
   const [credentials, setCredentials] = useState<Credential[]>([]); // 凭证列表
   const [loading, setLoading] = useState(false);    // 加载状态
   const [selectedDeviceType, setSelectedDeviceType] = useState<string>('');  // 用于控制enable密码字段的显示
+  const [selectedCredential, setSelectedCredential] = useState<FullCredential | null>(null); // 选中的完整凭证信息
 
   /**
    * 获取设备类型列表
@@ -58,8 +59,8 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
   useEffect(() => {
     const fetchCredentials = async () => {
       try {
-        const response = await request.get('device/credential/');
-        setCredentials(response.data);
+        const creds = await getCredentials();
+        setCredentials(creds);
       } catch (error) {
         console.error('获取凭证列表失败:', error);
         message.error('获取凭证列表失败');
@@ -69,15 +70,46 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
   }, []);
 
   /**
+   * 处理凭证选择变化
+   * 获取完整凭证信息
+   */
+  const handleCredentialChange = async (credentialId: number) => {
+    try {
+      const fullCredential = await getFullCredential(credentialId);
+      setSelectedCredential(fullCredential);
+      console.log('获取到完整凭证信息:', fullCredential);
+      
+      // 更新表单中的用户名和密码
+      form.setFieldsValue({
+        username: fullCredential.username,
+        password: fullCredential.password,
+        enable_secret: fullCredential.enable_password
+      });
+    } catch (error) {
+      console.error('获取完整凭证信息失败:', error);
+      message.error('获取完整凭证信息失败');
+    }
+  };
+
+  /**
    * 处理表单提交
    * 根据是否有initialValues决定是创建还是更新操作
    */
   const handleSubmit = async () => {
     try {
-      const values = await form.validateFields();
       setLoading(true);
+      const values = await form.validateFields();
+      
+      // 如果选择了凭证，使用凭证中的信息
+      if (selectedCredential) {
+        values.username = values.username || selectedCredential.username;
+        values.password = values.password || selectedCredential.password;
+        if (values.device_type?.startsWith('cisco_')) {
+          values.enable_secret = values.enable_secret || selectedCredential.enable_password;
+        }
+      }
 
-      if (initialValues) {
+      if (initialValues?.id) {
         await updateSSHConfig(initialValues.id, values);
         message.success('SSH配置更新成功');
       } else {
@@ -114,6 +146,14 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
       onCancel={onCancel}
       confirmLoading={loading}
       width={800}
+      footer={[
+        <Button key="cancel" onClick={onCancel}>
+          取消
+        </Button>,
+        <Button key="submit" type="primary" loading={loading} onClick={handleSubmit}>
+          确定
+        </Button>
+      ]}
     >
       <Spin spinning={loading}>
         <Form
@@ -184,7 +224,10 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
                 rules={[{ required: true, message: '请选择认证信息' }]}
                 tooltip="选择包含用户名和密码的认证信息"
               >
-                <Select placeholder="请选择认证信息">
+                <Select 
+                  placeholder="请选择认证信息"
+                  onChange={handleCredentialChange}
+                >
                   {credentials.map((credential) => (
                     <Option key={credential.id} value={credential.id}>
                       {credential.name}
@@ -198,11 +241,11 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
           {/* 思科设备特有的Enable密码配置 */}
           {selectedDeviceType.startsWith('cisco_') && (
             <Row gutter={24}>
-              <Col span={24}>
+              <Col span={12}>
                 <Form.Item
                   name="enable_secret"
                   label="Enable密码"
-                  tooltip="思科设备的Enable模式密码"
+                  tooltip="思科设备的特权模式密码"
                 >
                   <Input.Password placeholder="请输入Enable密码" />
                 </Form.Item>
@@ -210,14 +253,29 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
             </Row>
           )}
 
-          {/* Netmiko连接参数部分 */}
-          <div style={{ marginBottom: 16, fontWeight: 'bold' }}>Netmiko连接参数</div>
+          {/* 显示选中的凭证信息 */}
+          {selectedCredential && (
+            <Row gutter={24}>
+              <Col span={24}>
+                <Card size="small" style={{ marginBottom: 16 }}>
+                  <p><strong>用户名:</strong> {selectedCredential.username}</p>
+                  <p><strong>密码:</strong> {selectedCredential.password}</p>
+                  {selectedCredential.enable_password && (
+                    <p><strong>Enable密码:</strong> {selectedCredential.enable_password}</p>
+                  )}
+                </Card>
+              </Col>
+            </Row>
+          )}
+
+          {/* Netmiko特定参数部分 */}
+          <Typography.Title level={4}>Netmiko特定参数</Typography.Title>
           <Row gutter={24}>
             <Col span={12}>
               <Form.Item
                 name="global_delay_factor"
                 label="全局延迟因子"
-                tooltip="用于调整命令执行延迟的全局因子"
+                tooltip="调整命令执行延迟的因子，值越大延迟越长"
               >
                 <InputNumber min={0.1} max={10} step={0.1} style={{ width: '100%' }} />
               </Form.Item>
@@ -225,7 +283,7 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
             <Col span={12}>
               <Form.Item
                 name="auth_timeout"
-                label="认证超时(秒)"
+                label="认证超时时间(秒)"
                 tooltip="SSH认证超时时间"
               >
                 <InputNumber min={1} max={300} style={{ width: '100%' }} />
@@ -237,7 +295,7 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
             <Col span={12}>
               <Form.Item
                 name="banner_timeout"
-                label="Banner超时(秒)"
+                label="Banner超时时间(秒)"
                 tooltip="等待设备banner的超时时间"
               >
                 <InputNumber min={1} max={300} style={{ width: '100%' }} />
@@ -245,11 +303,12 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
             </Col>
             <Col span={12}>
               <Form.Item
-                name="session_timeout"
-                label="会话超时(秒)"
-                tooltip="SSH会话超时时间"
+                name="fast_cli"
+                label="快速CLI模式"
+                tooltip="是否启用快速CLI模式，可提高命令执行速度"
+                valuePropName="checked"
               >
-                <InputNumber min={1} max={3600} style={{ width: '100%' }} />
+                <Switch />
               </Form.Item>
             </Col>
           </Row>
@@ -257,13 +316,25 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
           <Row gutter={24}>
             <Col span={12}>
               <Form.Item
+                name="session_timeout"
+                label="会话超时时间(秒)"
+                tooltip="SSH会话超时时间"
+              >
+                <InputNumber min={1} max={300} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
                 name="conn_timeout"
-                label="连接超时(秒)"
+                label="连接超时时间(秒)"
                 tooltip="建立SSH连接的超时时间"
               >
                 <InputNumber min={1} max={300} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
+          </Row>
+
+          <Row gutter={24}>
             <Col span={12}>
               <Form.Item
                 name="keepalive"
@@ -273,30 +344,25 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
                 <InputNumber min={1} max={300} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-          </Row>
-
-          <Row gutter={24}>
-            <Col span={12}>
-              <Form.Item
-                name="fast_cli"
-                label="快速CLI模式"
-                tooltip="启用快速CLI模式以提高性能"
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
-            </Col>
             <Col span={12}>
               <Form.Item
                 name="verbose"
                 label="详细日志"
-                tooltip="启用详细日志输出"
+                tooltip="是否启用详细日志输出"
                 valuePropName="checked"
               >
                 <Switch />
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            name="description"
+            label="描述"
+            tooltip="SSH连接配置的描述信息"
+          >
+            <Input.TextArea rows={4} placeholder="请输入描述信息" />
+          </Form.Item>
         </Form>
       </Spin>
     </Modal>

@@ -1,17 +1,16 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import SQLAlchemyError
 import os
 import sys
 from datetime import datetime
 from passlib.context import CryptContext
-from sqlalchemy.sql import text
-from sqlalchemy import inspect
-from database.session import SessionLocal, engine
-from database.device_connection_models import DeviceConnection, DeviceConnectionPool, DeviceConnectionStats
+from sqlalchemy.inspection import inspect
 
 # 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 
 # 导入数据库配置和模型
 from database.config import get_database_url
@@ -22,8 +21,9 @@ from database.cmdb_models import (
     SystemType
 )
 from database.models import User, UsedTOTP, RefreshToken
-from database.category_models import Base as CategoryBase
+from database.category_models import Base as CategoryBase, Credential, CredentialType
 from database.config_management_models import Base as ConfigBase
+from database.device_connection_models import DeviceConnection
 
 # 创建密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -200,8 +200,6 @@ def init_device_connection_tables(engine):
         
         # 创建设备连接管理模块的表
         DeviceConnection.__table__.create(engine, checkfirst=True)
-        DeviceConnectionPool.__table__.create(engine, checkfirst=True)
-        DeviceConnectionStats.__table__.create(engine, checkfirst=True)
         
         # 检查device_connections表是否存在description和is_active列
         inspector = inspect(engine)
@@ -223,128 +221,96 @@ def init_device_connection_tables(engine):
             else:
                 print("device_connections表已存在且包含is_active列")
         
-        # 检查device_connection_pools表是否存在description列
-        if 'device_connection_pools' in inspector.get_table_names():
-            columns = [col['name'] for col in inspector.get_columns('device_connection_pools')]
-            if 'description' not in columns:
-                with engine.connect() as conn:
-                    conn.execute(text("ALTER TABLE device_connection_pools ADD COLUMN description TEXT"))
-                    conn.commit()
-                print("已添加description列到device_connection_pools表")
-            else:
-                print("device_connection_pools表已存在且包含description列")
+        print("设备连接管理模块的表创建完成")
+            
+    except Exception as e:
+        print(f"设备连接管理模块的表初始化失败: {str(e)}")
+        raise
+
+def init_credential_tables(engine):
+    """初始化凭证相关的表"""
+    try:
+        print("正在初始化凭证相关的表...")
         
-        # 创建默认连接池
-        db = SessionLocal()
-        try:
-            # 检查是否已存在默认连接池
-            default_pool = db.query(DeviceConnectionPool).first()
-            if not default_pool:
-                # 创建默认连接配置
-                default_connection = DeviceConnection(
-                    name="默认连接配置",
-                    device_type="cisco_ios",
-                    credential_id=1,
-                    port=22,
-                    description="系统默认连接配置",
-                    is_active=True
-                )
-                db.add(default_connection)
-                db.commit()
-                
-                # 创建默认连接池
-                default_pool = DeviceConnectionPool(
-                    connection_id=default_connection.id,
-                    max_connections=5,
-                    min_connections=1,
-                    idle_timeout=300,
-                    connection_timeout=30,
-                    description="默认连接池",
-                    is_active=True
-                )
-                db.add(default_pool)
-                db.commit()
-                print("已创建默认连接池")
+        # 创建凭证表
+        Credential.__table__.create(engine, checkfirst=True)
+        
+        # 检查credential_mgt_credentials表是否存在is_active列
+        inspector = inspect(engine)
+        if 'credential_mgt_credentials' in inspector.get_table_names():
+            columns = [col['name'] for col in inspector.get_columns('credential_mgt_credentials')]
+            if 'is_active' not in columns:
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE credential_mgt_credentials ADD COLUMN is_active BOOLEAN DEFAULT TRUE"))
+                    conn.commit()
+                print("已添加is_active列到credential_mgt_credentials表")
             else:
-                print("默认连接池已存在")
+                print("credential_mgt_credentials表已存在且包含is_active列")
+        
+        # 创建默认凭证
+        db = sessionmaker(autocommit=False, autoflush=False, bind=engine)()
+        try:
+            # 检查是否已存在默认凭证
+            default_credential = db.query(Credential).first()
+            if not default_credential:
+                # 创建默认凭证
+                default_credential = Credential(
+                    name="默认凭证",
+                    username="admin",
+                    password="admin",
+                    description="默认设备凭证",
+                    is_active=True
+                )
+                db.add(default_credential)
+                db.commit()
+                print("默认凭证创建成功")
+            else:
+                print("默认凭证已存在")
         except Exception as e:
+            print(f"创建默认凭证失败: {str(e)}")
             db.rollback()
-            print(f"创建默认连接池失败: {str(e)}")
+            raise
         finally:
             db.close()
-        
-        print("设备连接管理模块的表创建完成")
+            
     except Exception as e:
-        print(f"创建设备连接管理模块的表失败: {str(e)}")
+        print(f"凭证表初始化失败: {str(e)}")
         raise
 
 def init_databases():
     """初始化所有数据库"""
-    print("开始初始化数据库...")
-    
     try:
-        # 创建主数据库引擎
-        main_engine = create_engine(
-            get_database_url(),
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=30,
-            pool_recycle=1800
-        )
-        main_SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=main_engine)
+        # 获取数据库URL
+        database_url = get_database_url()
         
-        # 创建CMDB schema
-        print("正在创建CMDB schema...")
-        with main_engine.connect() as conn:
-            conn.execute(text("CREATE SCHEMA IF NOT EXISTS cmdb"))
-            conn.commit()
-        print("CMDB schema创建成功")
+        # 创建数据库引擎
+        engine = create_engine(database_url)
         
-        # 创建数据库表
-        print("正在创建主数据库表...")
-        Base.metadata.create_all(bind=main_engine)
-        print("主数据库表创建成功")
-        
-        print("正在创建CMDB数据库表...")
-        CMDBBase.metadata.create_all(bind=main_engine)
-        print("CMDB数据库表创建成功")
-        
-        print("正在创建设备分类数据库表...")
-        CategoryBase.metadata.create_all(bind=main_engine)
-        print("设备分类数据库表创建成功")
-        
-        print("正在创建配置管理数据库表...")
-        ConfigBase.metadata.create_all(bind=main_engine)
-        print("配置管理数据库表创建成功")
+        # 创建所有表
+        Base.metadata.create_all(engine)
+        CMDBBase.metadata.create_all(engine)
+        CategoryBase.metadata.create_all(engine)
+        ConfigBase.metadata.create_all(engine)
         
         # 初始化系统数据
-        print("正在初始化系统数据...")
-        db = main_SessionLocal()
+        db = sessionmaker(autocommit=False, autoflush=False, bind=engine)()
         try:
             init_system_data(db)
-        finally:
-            db.close()
-        
-        # 初始化CMDB数据
-        print("正在初始化CMDB数据...")
-        db = main_SessionLocal()  # 使用主数据库会话
-        try:
             init_cmdb_data(db)
         finally:
             db.close()
         
         # 初始化设备连接管理模块的表
-        print("正在初始化设备连接管理模块的表...")
-        init_device_connection_tables(main_engine)
+        init_device_connection_tables(engine)
         
-        print("所有数据库初始化完成")
+        # 初始化凭证相关的表
+        init_credential_tables(engine)
         
-    except SQLAlchemyError as e:
-        print(f"数据库初始化失败: {str(e)}")
-        sys.exit(1)
+        print("数据库初始化完成")
+        
     except Exception as e:
-        print(f"发生未知错误: {str(e)}")
-        sys.exit(1)
+        print(f"数据库初始化失败: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     init_databases() 

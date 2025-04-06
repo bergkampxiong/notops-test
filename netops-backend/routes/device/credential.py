@@ -37,12 +37,16 @@ class CredentialResponse(CredentialBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    is_active: Optional[bool] = True
     username: Optional[str] = None
     api_key: Optional[str] = None
     private_key: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
 # 凭证更新模型
 class CredentialUpdate(BaseModel):
@@ -57,20 +61,17 @@ class CredentialUpdate(BaseModel):
     passphrase: Optional[str] = None
 
 # 完整凭证响应模型（包含密码）
-class FullCredentialResponse(CredentialBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    username: Optional[str] = None
+class FullCredentialResponse(CredentialResponse):
     password: Optional[str] = None
     enable_password: Optional[str] = None
-    api_key: Optional[str] = None
     api_secret: Optional[str] = None
-    private_key: Optional[str] = None
     passphrase: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
 # 获取所有凭证
 @router.get("/", response_model=List[CredentialResponse])

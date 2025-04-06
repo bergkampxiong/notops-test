@@ -21,6 +21,9 @@ export interface SSHConfig {
   conn_timeout: number;          // 建立SSH连接的超时时间（秒）
   keepalive: number;            // SSH连接保活间隔（秒）
   verbose: boolean;             // 是否启用详细日志输出
+  description?: string;         // 描述信息
+  username: string;            // 用户名（从凭证中获取）
+  password: string;            // 密码（从凭证中获取）
   created_at: string;           // 创建时间
   updated_at: string;           // 更新时间
 }
@@ -34,8 +37,10 @@ export interface SSHConfigCreate {
   device_type: string;
   credential_id: number;
   pool_config_id?: number;
-  port: number;
+  port?: number;
   enable_secret?: string;
+  username: string;
+  password: string;
   // Netmiko特定参数（可选）
   global_delay_factor?: number;
   auth_timeout?: number;
@@ -45,6 +50,7 @@ export interface SSHConfigCreate {
   conn_timeout?: number;
   keepalive?: number;
   verbose?: boolean;
+  description?: string;
 }
 
 /**
@@ -68,33 +74,22 @@ const deviceTypes = [
  * 获取所有SSH配置
  * @returns Promise<SSHConfig[]> SSH配置列表
  */
-export const getSSHConfigs = async (): Promise<SSHConfig[]> => {
-  try {
-    console.log('正在获取SSH配置列表...');
-    const response = await request.get('device/credential/');
-    console.log('SSH配置列表获取成功:', response.data);
-    return response.data;
-  } catch (error) {
-    console.error('获取SSH配置失败:', error);
-    // 返回空数组而不是抛出错误
-    return [];
-  }
-};
+export async function getSSHConfigs(): Promise<SSHConfig[]> {
+  const response = await request.get('device/connections/');
+  return response.data;
+}
 
 /**
  * 创建新的SSH配置
  * @param data SSH配置创建参数
  * @returns Promise<SSHConfig> 新创建的SSH配置
  */
-export const createSSHConfig = async (data: SSHConfigCreate): Promise<SSHConfig> => {
-  try {
-    const response = await request.post('device/connections/', data);
-    return response.data;
-  } catch (error) {
-    console.error('创建SSH配置失败:', error);
-    throw error;
-  }
-};
+export async function createSSHConfig(data: SSHConfigCreate): Promise<SSHConfig> {
+  console.log('创建SSH配置，请求数据:', data);
+  const response = await request.post('device/connections/', data);
+  console.log('创建SSH配置成功，响应数据:', response);
+  return response.data;
+}
 
 /**
  * 更新现有SSH配置
@@ -102,28 +97,18 @@ export const createSSHConfig = async (data: SSHConfigCreate): Promise<SSHConfig>
  * @param data 更新的配置数据
  * @returns Promise<SSHConfig> 更新后的SSH配置
  */
-export const updateSSHConfig = async (id: number, data: Partial<SSHConfigCreate>): Promise<SSHConfig> => {
-  try {
-    const response = await request.put(`device/connections/${id}/`, data);
-    return response.data;
-  } catch (error) {
-    console.error('更新SSH配置失败:', error);
-    throw error;
-  }
-};
+export async function updateSSHConfig(id: number, data: Partial<SSHConfigCreate>): Promise<SSHConfig> {
+  const response = await request.put(`device/connections/${id}/`, data);
+  return response.data;
+}
 
 /**
  * 删除SSH配置
  * @param id 要删除的配置ID
  */
-export const deleteSSHConfig = async (id: number): Promise<void> => {
-  try {
-    await request.delete(`device/connections/${id}/`);
-  } catch (error) {
-    console.error('删除SSH配置失败:', error);
-    throw error;
-  }
-};
+export async function deleteSSHConfig(id: number): Promise<void> {
+  await request.delete(`device/connections/${id}/`);
+}
 
 /**
  * 获取SSH连接池状态
@@ -205,6 +190,6 @@ export const updateSSHPoolConfig = async (
  * 获取设备类型列表
  * @returns Promise<string[]> 设备类型列表
  */
-export const getDeviceTypes = async () => {
+export async function getDeviceTypes(): Promise<string[]> {
   return deviceTypes;
-}; 
+} 

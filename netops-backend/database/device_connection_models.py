@@ -26,34 +26,26 @@ class DeviceConnection(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
     is_active = Column(Boolean, default=True, comment="是否启用")
 
-    # 关联连接池
-    pools = relationship("DeviceConnectionPool", back_populates="connection", cascade="all, delete-orphan")
-
 class DeviceConnectionPool(Base):
-    """设备连接池表"""
+    """设备连接池配置表"""
     __tablename__ = "device_connection_pools"
 
     id = Column(Integer, primary_key=True, index=True)
-    connection_id = Column(Integer, ForeignKey("device_connections.id", ondelete="CASCADE"), nullable=False)
+    connection_id = Column(Integer, ForeignKey("device_connections.id"), nullable=False, comment="连接配置ID")
     max_connections = Column(Integer, default=5, comment="最大连接数")
-    min_idle = Column(Integer, default=1, comment="最小空闲连接数")
-    idle_timeout = Column(Integer, default=300, comment="空闲超时时间(秒)")
-    connection_timeout = Column(Integer, default=30, comment="连接超时时间(秒)")
-    description = Column(Text, comment="描述")
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
     is_active = Column(Boolean, default=True, comment="是否启用")
 
-    # 关联
-    connection = relationship("DeviceConnection", back_populates="pools")
-    stats = relationship("DeviceConnectionStats", back_populates="pool", uselist=False, cascade="all, delete-orphan")
+    # 关联关系
+    connection = relationship("DeviceConnection", backref="pools")
 
 class DeviceConnectionStats(Base):
-    """设备连接池统计信息表"""
+    """设备连接统计表"""
     __tablename__ = "device_connection_stats"
 
     id = Column(Integer, primary_key=True, index=True)
-    pool_id = Column(Integer, ForeignKey("device_connection_pools.id", ondelete="CASCADE"), nullable=False)
+    pool_id = Column(Integer, ForeignKey("device_connection_pools.id"), nullable=False, comment="连接池ID")
     current_connections = Column(Integer, default=0, comment="当前连接数")
     total_connections = Column(Integer, default=0, comment="总连接数")
     failed_connections = Column(Integer, default=0, comment="失败连接数")
@@ -61,5 +53,5 @@ class DeviceConnectionStats(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), comment="创建时间")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), comment="更新时间")
 
-    # 关联
-    pool = relationship("DeviceConnectionPool", back_populates="stats") 
+    # 关联关系
+    pool = relationship("DeviceConnectionPool", backref="stats") 

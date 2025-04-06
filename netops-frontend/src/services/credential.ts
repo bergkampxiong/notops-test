@@ -1,4 +1,4 @@
-import { api } from '../utils/api';
+import request from '../utils/request';
 
 /**
  * 凭证接口定义
@@ -32,7 +32,7 @@ export interface FullCredential extends Credential {
  */
 export const getCredential = async (id: number): Promise<Credential> => {
   try {
-    const response = await api.get(`/device/credential/${id}`);
+    const response = await request.get(`device/credential/${id}`);
     return response.data;
   } catch (error) {
     console.error('获取凭证信息失败:', error);
@@ -47,7 +47,7 @@ export const getCredential = async (id: number): Promise<Credential> => {
  */
 export const getFullCredential = async (id: number): Promise<FullCredential> => {
   try {
-    const response = await api.get(`/device/credential/${id}/full`);
+    const response = await request.get(`device/credential/${id}/full`);
     return response.data;
   } catch (error) {
     console.error('获取完整凭证信息失败:', error);
@@ -62,7 +62,11 @@ export const getFullCredential = async (id: number): Promise<FullCredential> => 
 export const getCredentials = async (): Promise<Credential[]> => {
   try {
     console.log('正在获取凭证列表...');
-    const response = await api.get('/device/credential');
+    const response = await request.get('device/credential', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
     console.log('凭证列表获取成功:', response.data);
     return response.data;
   } catch (error) {
