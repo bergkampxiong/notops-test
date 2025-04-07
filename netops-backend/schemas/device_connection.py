@@ -60,7 +60,7 @@ class SSHConnectionResponse(BaseModel):
     description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    is_active: bool
+    is_active: bool = True
     username: Optional[str] = None
     password: Optional[str] = None
 

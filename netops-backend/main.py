@@ -32,10 +32,12 @@ app = FastAPI(title="NetOps API", version="1.0.0")
 # 配置CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://172.18.40.99", "http://172.19.33.110"],  # 允许特定的来源
+    allow_origins=["*"],  # 允许特定的来源
     allow_credentials=True,
-    allow_methods=["*"],  # 允许所有方法
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],  # 明确指定允许的方法
     allow_headers=["*"],  # 允许所有请求头
+    expose_headers=["*"],  # 暴露所有响应头
+    max_age=3600,  # 预检请求的缓存时间
 )
 
 def init_db():
@@ -62,7 +64,7 @@ app.include_router(device_router)
 app.include_router(config_management.router, prefix="/api", tags=["config"])
 app.include_router(config_generator_router, prefix="/api/config-generator", tags=["config-generator"])
 app.include_router(connections.router)
-app.include_router(ssh_connections.router)
+app.include_router(ssh_connections.router, prefix="/api")
 
 # 定期清理任务
 def cleanup_expired_records():

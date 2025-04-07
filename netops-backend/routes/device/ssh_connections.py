@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # 创建路由器
 router = APIRouter(
-    prefix="/api/device/connections",
+    prefix="/device/connections",
     tags=["device-connections"]
 )
 
@@ -194,12 +194,41 @@ async def update_device_connection(
         
         # 更新字段
         update_data = connection_update.dict(exclude_unset=True)
+        
+        # 如果更新包含credential_id，确保转换为字符串
+        if 'credential_id' in update_data:
+            update_data['credential_id'] = str(update_data['credential_id'])
+            
         for field, value in update_data.items():
             setattr(db_connection, field, value)
         
         db.commit()
         db.refresh(db_connection)
-        return db_connection
+
+        # 构造响应数据
+        response_data = {
+            "id": db_connection.id,
+            "name": db_connection.name,
+            "device_type": db_connection.device_type,
+            "credential_id": str(db_connection.credential_id),  # 转换为字符串
+            "port": db_connection.port,
+            "enable_secret": db_connection.enable_secret,
+            "global_delay_factor": db_connection.global_delay_factor,
+            "auth_timeout": db_connection.auth_timeout,
+            "banner_timeout": db_connection.banner_timeout,
+            "fast_cli": db_connection.fast_cli,
+            "session_timeout": db_connection.session_timeout,
+            "conn_timeout": db_connection.conn_timeout,
+            "keepalive": db_connection.keepalive,
+            "verbose": db_connection.verbose,
+            "description": db_connection.description,
+            "created_at": db_connection.created_at or datetime.now(),  # 确保有值
+            "updated_at": db_connection.updated_at or datetime.now(),  # 确保有值
+            "is_active": db_connection.is_active,
+            "username": None,  # 这些字段从凭证中获取
+            "password": None   # 这些字段从凭证中获取
+        }
+        return response_data
     except HTTPException:
         raise
     except Exception as e:
