@@ -21,7 +21,7 @@ import database.config_management_models  # 导入配置管理模型
 # 导入路由
 from routes import auth, users, audit, ldap, security, config_management, config_generator_router
 from routes.cmdb import router as cmdb_router
-from routes.device import router as device_router
+from routes.device import router as device_router, connections, ssh_connections
 
 # 导入连接管理器
 from utils.device_connection_manager import device_connection_manager
@@ -61,6 +61,8 @@ app.include_router(cmdb_router, prefix="/api")
 app.include_router(device_router)
 app.include_router(config_management.router, prefix="/api", tags=["config"])
 app.include_router(config_generator_router, prefix="/api/config-generator", tags=["config-generator"])
+app.include_router(connections.router)
+app.include_router(ssh_connections.router)
 
 # 定期清理任务
 def cleanup_expired_records():
