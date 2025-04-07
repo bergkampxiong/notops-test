@@ -5,6 +5,7 @@ import logging
 from database.session import get_db
 from database.device_connection_models import DeviceConnection
 from schemas.device_connection import SSHConnectionCreate, SSHConnectionUpdate, SSHConnectionResponse
+from datetime import datetime
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -22,7 +23,32 @@ async def get_device_connections(
     """获取所有SSH连接配置"""
     try:
         connections = db.query(DeviceConnection).all()
-        return connections
+        # 构造响应数据
+        response_data = []
+        for conn in connections:
+            response_data.append({
+                "id": conn.id,
+                "name": conn.name,
+                "device_type": conn.device_type,
+                "credential_id": str(conn.credential_id),  # 确保是字符串
+                "port": conn.port,
+                "enable_secret": conn.enable_secret,
+                "global_delay_factor": conn.global_delay_factor,
+                "auth_timeout": conn.auth_timeout,
+                "banner_timeout": conn.banner_timeout,
+                "fast_cli": conn.fast_cli,
+                "session_timeout": conn.session_timeout,
+                "conn_timeout": conn.conn_timeout,
+                "keepalive": conn.keepalive,
+                "verbose": conn.verbose,
+                "description": conn.description,
+                "created_at": conn.created_at or datetime.now(),  # 确保有值
+                "updated_at": conn.updated_at or datetime.now(),  # 确保有值
+                "is_active": conn.is_active,
+                "username": None,  # 这些字段从凭证中获取
+                "password": None   # 这些字段从凭证中获取
+            })
+        return response_data
     except Exception as e:
         logger.error(f"获取SSH连接配置列表失败: {str(e)}")
         raise HTTPException(
@@ -55,37 +81,74 @@ async def create_device_connection(
             description=connection.description,
             is_active=True
         )
-        db.add(db_connection)
-        db.commit()
-        db.refresh(db_connection)
         
-        # 构造响应数据
-        response_data = {
-            "id": db_connection.id,
-            "name": db_connection.name,
-            "device_type": db_connection.device_type,
-            "credential_id": db_connection.credential_id,
-            "port": db_connection.port,
-            "enable_secret": db_connection.enable_secret,
-            "global_delay_factor": db_connection.global_delay_factor,
-            "auth_timeout": db_connection.auth_timeout,
-            "banner_timeout": db_connection.banner_timeout,
-            "fast_cli": db_connection.fast_cli,
-            "session_timeout": db_connection.session_timeout,
-            "conn_timeout": db_connection.conn_timeout,
-            "keepalive": db_connection.keepalive,
-            "verbose": db_connection.verbose,
-            "description": db_connection.description,
-            "created_at": db_connection.created_at,
-            "updated_at": db_connection.updated_at,
-            "is_active": db_connection.is_active,
-            "username": None,  # 这些字段从凭证中获取
-            "password": None   # 这些字段从凭证中获取
-        }
-        return response_data
+        try:
+            db.add(db_connection)
+            db.commit()
+            db.refresh(db_connection)
+        except Exception as db_error:
+            logger.error(f"数据库操作失败: {str(db_error)}")
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"数据库操作失败: {str(db_error)}"
+            )
+        
+        try:
+            # 构造响应数据
+            response_data = {
+                "id": db_connection.id,
+                "name": db_connection.name,
+                "device_type": db_connection.device_type,
+                "credential_id": str(db_connection.credential_id),  # 确保是字符串
+                "port": db_connection.port,
+                "enable_secret": db_connection.enable_secret,
+                "global_delay_factor": db_connection.global_delay_factor,
+                "auth_timeout": db_connection.auth_timeout,
+                "banner_timeout": db_connection.banner_timeout,
+                "fast_cli": db_connection.fast_cli,
+                "session_timeout": db_connection.session_timeout,
+                "conn_timeout": db_connection.conn_timeout,
+                "keepalive": db_connection.keepalive,
+                "verbose": db_connection.verbose,
+                "description": db_connection.description,
+                "created_at": db_connection.created_at or datetime.now(),  # 确保有值
+                "updated_at": db_connection.updated_at or datetime.now(),  # 确保有值
+                "is_active": db_connection.is_active,
+                "username": None,  # 这些字段从凭证中获取，但不在请求中
+                "password": None   # 这些字段从凭证中获取，但不在请求中
+            }
+            return response_data
+        except Exception as response_error:
+            logger.error(f"构造响应数据失败: {str(response_error)}")
+            # 即使响应构造失败，数据也已经保存到数据库中了
+            # 所以我们返回一个基本的成功响应
+            return {
+                "id": db_connection.id,
+                "name": db_connection.name,
+                "device_type": db_connection.device_type,
+                "credential_id": str(db_connection.credential_id),
+                "port": db_connection.port,
+                "enable_secret": db_connection.enable_secret,
+                "global_delay_factor": db_connection.global_delay_factor,
+                "auth_timeout": db_connection.auth_timeout,
+                "banner_timeout": db_connection.banner_timeout,
+                "fast_cli": db_connection.fast_cli,
+                "session_timeout": db_connection.session_timeout,
+                "conn_timeout": db_connection.conn_timeout,
+                "keepalive": db_connection.keepalive,
+                "verbose": db_connection.verbose,
+                "description": db_connection.description,
+                "is_active": db_connection.is_active,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+                "username": None,
+                "password": None
+            }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"创建设备连接配置失败: {str(e)}")
-        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"创建设备连接配置失败: {str(e)}"

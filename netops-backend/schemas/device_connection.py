@@ -21,7 +21,8 @@ class SSHConnectionBase(BaseModel):
 
 class SSHConnectionCreate(SSHConnectionBase):
     """创建SSH连接请求模型"""
-    pass
+    username: Optional[str] = Field(None, description="用户名")
+    password: Optional[str] = Field(None, description="密码")
 
 class SSHConnectionUpdate(BaseModel):
     """更新SSH连接请求模型"""

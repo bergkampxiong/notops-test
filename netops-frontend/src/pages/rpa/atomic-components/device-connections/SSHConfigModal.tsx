@@ -100,13 +100,22 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
       setLoading(true);
       const values = await form.validateFields();
       
+      // 确保所有必需字段都存在
+      if (!values.name || !values.device_type || !values.credential_id) {
+        message.error('请填写所有必需字段');
+        return;
+      }
+
       // 如果选择了凭证，使用凭证中的信息
       if (selectedCredential) {
-        values.username = values.username || selectedCredential.username;
-        values.password = values.password || selectedCredential.password;
+        values.username = selectedCredential.username;
+        values.password = selectedCredential.password;
         if (values.device_type?.startsWith('cisco_')) {
           values.enable_secret = values.enable_secret || selectedCredential.enable_password;
         }
+      } else {
+        message.error('请选择认证信息');
+        return;
       }
 
       if (initialValues?.id) {
@@ -120,10 +129,11 @@ const SSHConfigModal: React.FC<SSHConfigModalProps> = ({
       form.resetFields();
       onSuccess();
     } catch (error: any) {
+      console.error('提交表单失败:', error);
       if (error.response?.data?.detail) {
         message.error(error.response.data.detail);
       } else {
-        message.error('操作失败');
+        message.error('操作失败: ' + (error.message || '未知错误'));
       }
     } finally {
       setLoading(false);

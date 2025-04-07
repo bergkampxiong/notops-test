@@ -3,7 +3,7 @@ export interface SSHConfig {
   id: string;
   name: string;
   deviceType: string;
-  credentialId: string;
+  credentialId: number;
   port: number;
   enableSecret?: string;
   globalDelayFactor: number;

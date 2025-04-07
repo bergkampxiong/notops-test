@@ -86,6 +86,16 @@ export async function getSSHConfigs(): Promise<SSHConfig[]> {
  */
 export async function createSSHConfig(data: SSHConfigCreate): Promise<SSHConfig> {
   try {
+    // 验证必需字段
+    if (!data.name || !data.device_type || !data.credential_id) {
+      throw new Error('缺少必需字段：name、device_type 或 credential_id');
+    }
+
+    // 验证用户名和密码
+    if (!data.username || !data.password) {
+      throw new Error('缺少必需字段：username 或 password');
+    }
+
     console.log('创建SSH配置，请求数据:', data);
     const response = await request.post('device/connections/', data);
     console.log('创建SSH配置成功，响应数据:', response);
@@ -94,14 +104,14 @@ export async function createSSHConfig(data: SSHConfigCreate): Promise<SSHConfig>
     console.error('创建SSH配置失败:', error);
     if (error.response) {
       // 服务器返回错误
-      const errorMessage = error.response.data?.detail || '创建SSH配置失败';
+      const errorMessage = error.response.data?.detail || error.response.data?.message || '创建SSH配置失败';
       throw new Error(errorMessage);
     } else if (error.request) {
       // 请求发送失败
       throw new Error('无法连接到服务器，请检查网络连接');
     } else {
-      // 其他错误
-      throw new Error('创建SSH配置时发生未知错误');
+      // 其他错误（包括验证错误）
+      throw error;
     }
   }
 }
