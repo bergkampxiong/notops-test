@@ -116,7 +116,7 @@ const TwoFactorVerify: React.FC = () => {
             <>
               <div style={{ textAlign: 'center', margin: '20px 0' }}>
                 <img 
-                  src={`auth/totp-qrcode?uri=${encodeURIComponent(totpData.uri)}`} 
+                  src={`/api/auth/totp-qrcode?uri=${encodeURIComponent(totpData.uri)}`} 
                   alt="TOTP QR Code" 
                   style={{ maxWidth: '100%', border: '1px solid #f0f0f0', padding: 8 }}
                 />
