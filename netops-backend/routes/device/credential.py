@@ -6,6 +6,7 @@ from database.category_models import Credential, CredentialType
 from auth.authentication import get_current_user
 from pydantic import BaseModel, Field
 from datetime import datetime
+from database.device_connection_models import DeviceConnection
 
 router = APIRouter(
     prefix="/api/device/credential",
@@ -255,6 +256,18 @@ async def delete_credential(
             detail="凭证不存在"
         )
     
+    # 检查是否有设备连接使用此凭证
+    device_connections = db.query(DeviceConnection).filter(
+        DeviceConnection.credential_id == str(credential_id)
+    ).all()
+    
+    if device_connections:
+        # 如果有关联的设备连接，先删除它们
+        for connection in device_connections:
+            db.delete(connection)
+        db.commit()
+    
+    # 删除凭证
     db.delete(db_credential)
     db.commit()
     return None

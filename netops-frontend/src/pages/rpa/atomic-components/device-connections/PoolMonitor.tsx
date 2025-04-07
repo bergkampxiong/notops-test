@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Button, Select, message } from 'antd';
+import { Card, Row, Col, Statistic, Button, Select, message, Radio } from 'antd';
 import { Line } from '@ant-design/charts';
 import { getPoolStats, getPoolMetrics, cleanupConnections } from '../../../../services/poolConfig';
 import type { PoolStats } from '../../../../services/poolConfig';
@@ -11,6 +11,7 @@ const PoolMonitor: React.FC = () => {
   const [metrics, setMetrics] = useState<any>(null);
   const [timeRange, setTimeRange] = useState('1h');
   const [loading, setLoading] = useState(false);
+  const [poolType, setPoolType] = useState('redis');
 
   const fetchData = async () => {
     try {
@@ -33,7 +34,7 @@ const PoolMonitor: React.FC = () => {
     fetchData();
     const timer = setInterval(fetchData, 60000); // 每1分钟更新一次
     return () => clearInterval(timer);
-  }, [timeRange]);
+  }, [timeRange, poolType]);
 
   const handleCleanup = async () => {
     try {
@@ -67,7 +68,19 @@ const PoolMonitor: React.FC = () => {
       <Row gutter={[16, 16]}>
         <Col span={24}>
           <Card
-            title="连接池状态"
+            title={
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span>连接池状态</span>
+                <Radio.Group 
+                  value={poolType} 
+                  onChange={(e) => setPoolType(e.target.value)}
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="redis">Redis通信连接池</Radio.Button>
+                  <Radio.Button value="device">网络设备连接池</Radio.Button>
+                </Radio.Group>
+              </div>
+            }
             extra={
               <div style={{ display: 'flex', gap: '16px' }}>
                 <Select

