@@ -152,6 +152,9 @@ class SessionManager {
    * 处理用户活动
    */
   public handleUserActivity = (): void => {
+    // 更新最后活动时间
+    this.updateLastActivity();
+
     // 清除所有现有计时器
     if (this.timer) {
       clearTimeout(this.timer);

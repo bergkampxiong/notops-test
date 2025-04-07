@@ -65,7 +65,22 @@ const SecuritySettings: React.FC = () => {
   const handleSubmit = async (values: BackendSecuritySettings) => {
     setLoading(true);
     try {
-      await request.post('security/settings', values);
+      // 确保所有必需的字段都存在
+      const settingsData = {
+        password_expiry_days: values.password_expiry_days,
+        max_failed_attempts: values.max_failed_attempts,
+        lockout_duration_minutes: values.lockout_duration_minutes,
+        session_timeout_minutes: values.session_timeout_minutes,
+        require_2fa_for_admins: values.require_2fa_for_admins,
+        password_complexity_enabled: values.password_complexity_enabled,
+        password_min_length: values.password_min_length,
+        password_require_uppercase: values.password_require_uppercase,
+        password_require_lowercase: values.password_require_lowercase,
+        password_require_numbers: values.password_require_numbers,
+        password_require_special: values.password_require_special
+      };
+      
+      await request.put('security/settings', settingsData);
       message.success('安全设置保存成功');
       fetchSettings();
     } catch (error) {
@@ -151,6 +166,14 @@ const SecuritySettings: React.FC = () => {
                   rules={[{ required: true, message: '请输入密码有效期' }]}
                 >
                   <Input type="number" min={1} />
+                </Form.Item>
+                
+                <Form.Item
+                  name="password_complexity_enabled"
+                  label="启用密码复杂度要求"
+                  valuePropName="checked"
+                >
+                  <Switch />
                 </Form.Item>
                 
                 <Title level={5}>密码复杂度要求</Title>
