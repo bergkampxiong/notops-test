@@ -48,6 +48,12 @@ const systemTypeColors: Record<string, string> = {
   '其他': 'default'
 };
 
+interface ImportResponse {
+  imported: number;
+  failed: number;
+  errors?: string[];
+}
+
 /**
  * CMDB资产查询组件
  */
@@ -116,12 +122,10 @@ const CMDBQuery: React.FC = () => {
   const fetchAssets = async () => {
     setLoading(true);
     try {
-      const response = await request.get('/cmdb/assets', {
-        params: {
-          skip: 0,
-          limit: 100,
-          ...searchParams
-        }
+      const response = await request.post('/cmdb/assets/query', {
+        skip: 0,
+        limit: 100,
+        ...searchParams
       });
       
       if (response.data && Array.isArray(response.data)) {
@@ -222,6 +226,32 @@ const CMDBQuery: React.FC = () => {
       return;
     }
 
+    // 定义允许的设备类型和系统类型
+    const allowedDeviceTypes = [
+      'Server',
+      'Network',
+      'K8S Node',
+      'K8S Cluster',
+      'Router',
+      'Switch',
+      'Firewall',
+      'Virtual Machine'
+    ];
+
+    const allowedSystemTypes = [
+      'cisco_ios',
+      'cisco_nxos',
+      'cisco_xe',
+      'cisco_xr',
+      'huawei_vrpv8',
+      'linux',
+      'paloalto_panos',
+      'ruijie_os',
+      'hp_comware',
+      'huawei',
+      'fortinet'
+    ];
+
     // 创建CSV内容
     const columnsWithDataIndex = columns.filter(col => col.dataIndex !== undefined && col.dataIndex !== 'action');
     
@@ -247,10 +277,18 @@ const CMDBQuery: React.FC = () => {
         } else {
           value = asset[dataIndex] || '';
         }
+
+        // 验证设备类型和系统类型
+        if (dataIndex === 'device_type' && !allowedDeviceTypes.includes(value)) {
+          value = ''; // 如果设备类型不在允许列表中，设置为空
+        }
+        if (dataIndex === 'system_type' && !allowedSystemTypes.includes(value)) {
+          value = ''; // 如果系统类型不在允许列表中，设置为空
+        }
         
-        // 如果值包含逗号，用双引号包裹
-        if (String(value).includes(',')) {
-          return `"${value}"`;
+        // 如果值包含逗号、引号或换行符，用双引号包裹并处理内部引号
+        if (String(value).includes(',') || String(value).includes('"') || String(value).includes('\n')) {
+          return `"${String(value).replace(/"/g, '""')}"`;
         }
         return String(value);
       })
@@ -266,7 +304,7 @@ const CMDBQuery: React.FC = () => {
     const csvContentWithBOM = BOM + csvContent;
 
     // 创建下载链接
-    const blob = new Blob([csvContentWithBOM], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csvContentWithBOM], { type: 'application/vnd.ms-excel;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -274,6 +312,7 @@ const CMDBQuery: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url); // 释放URL对象
   };
 
   // 处理筛选确认
@@ -713,28 +752,42 @@ const CMDBQuery: React.FC = () => {
 
   // 处理CSV导入
   const handleImport = async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
     try {
-      const response = await request.post('/cmdb/assets/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      message.success('导入成功');
-      fetchAssets();
-      setImportModalVisible(false);
-    } catch (error) {
-      message.error('导入失败');
+      // 读取CSV文件内容
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const csvContent = e.target?.result as string;
+          // 发送CSV内容为JSON对象
+          const response = await request.post<ImportResponse>('/cmdb/assets/import', { content: csvContent });
+          message.success(`导入成功: ${response.data.imported}条记录已导入, ${response.data.failed}条记录失败`);
+          if (response.data.errors && response.data.errors.length > 0) {
+            console.error('导入错误:', response.data.errors);
+            message.warning(`导入过程中有${response.data.errors.length}个错误，请查看控制台`);
+          }
+          fetchAssets();
+          setImportModalVisible(false);
+        } catch (error: any) {
+          console.error('导入失败:', error);
+          message.error('导入失败: ' + (error.response?.data?.detail || '未知错误'));
+        }
+      };
+      reader.onerror = () => {
+        message.error('读取文件失败');
+      };
+      reader.readAsText(file, 'UTF-8');
+    } catch (error: any) {
+      console.error('导入失败:', error);
+      message.error('导入失败: ' + (error.response?.data?.detail || '未知错误'));
     }
   };
 
   // CSV模板示例数据
   const csvTemplateData = `设备名称,资产标签,设备类型,厂商,型号,IP地址,SN码,系统类型,状态,位置,所有者,所属部门,上线时间,购买成本,当前价值,购买日期,保修到期,备注
-Server001,SVR001,服务器,Dell,PowerEdge R740,192.168.1.101,ABCD1234,linux,在线,机房A,张三,IT部门,2023-01-15,15000,12000,2023-01-01,2024-12-31,测试服务器
-Switch001,SW001,网络设备,Cisco,Catalyst 9300,192.168.1.1,XYZ9876,cisco_ios,在线,机房B,李四,运维部门,2023-02-20,8000,7500,2023-02-01,2024-12-31,核心交换机
-K8SNode001,K8S001,K8S节点,HP,ProLiant DL380,192.168.2.101,HP12345,linux,在线,机房A,王五,研发部门,2023-03-10,12000,11000,2023-03-01,2024-12-31,K8S节点
-K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,研发部门,2023-04-05,,,2023-04-01,2024-12-31,K8S集群`;
+Server001,SVR001,Server,Dell,PowerEdge R740,192.168.1.101,ABCD1234,linux,在线,机房A,张三,IT部门,2023-01-15,15000,12000,2023-01-01,2024-12-31,测试服务器
+Switch001,SW001,Switch,Cisco,Catalyst 9300,192.168.1.1,XYZ9876,cisco_ios,在线,机房B,李四,运维部门,2023-02-20,8000,7500,2023-02-01,2024-12-31,核心交换机
+K8SNode001,K8S001,K8S Node,HP,ProLiant DL380,192.168.2.101,HP12345,linux,在线,机房A,王五,研发部门,2023-03-10,12000,11000,2023-03-01,2024-12-31,K8S节点
+K8SCluster001,K8SC001,K8S Cluster,,,192.168.3.0/24,,linux,在线,机房C,赵六,研发部门,2023-04-05,,,2023-04-01,2024-12-31,K8S集群`;
 
   // CSV模板示例模态框
   const renderCsvTemplateModal = () => (
@@ -751,7 +804,10 @@ K8SCluster001,K8SC001,K8S集群,,,192.168.3.0/24,,linux,在线,机房C,赵六,�
           key="download" 
           type="primary"
           onClick={() => {
-            const blob = new Blob([csvTemplateData], { type: 'text/csv;charset=utf-8;' });
+            // 添加BOM标记，确保Excel正确识别UTF-8编码
+            const BOM = "\uFEFF";
+            const csvContentWithBOM = BOM + csvTemplateData;
+            const blob = new Blob([csvContentWithBOM], { type: 'application/vnd.ms-excel;charset=utf-8' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
             link.download = 'cmdb_import_template.csv';
