@@ -52,9 +52,20 @@ request.interceptors.request.use(
       config.url = config.url.substring(1);
     }
 
+    // 添加调试日志
+    console.log(`发送请求: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    if (config.data) {
+      // 不记录敏感信息
+      const logData = {...config.data};
+      if (logData.bind_password) logData.bind_password = '********';
+      if (logData.password) logData.password = '********';
+      console.log('请求数据:', logData);
+    }
+
     return config;
   },
   (error) => {
+    console.error('请求错误:', error);
     return Promise.reject(error);
   }
 );
@@ -62,6 +73,10 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   (response: AxiosResponse) => {
+    // 添加调试日志
+    console.log(`收到响应: ${response.status} ${response.config.url}`);
+    console.log('响应数据:', response.data);
+    
     // 构造标准响应格式
     const standardResponse = {
       status: response.status,
@@ -74,6 +89,13 @@ request.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // 添加调试日志
+    console.error('响应错误:', error);
+    if (error.response) {
+      console.error('错误状态:', error.response.status);
+      console.error('错误数据:', error.response.data);
+    }
+    
     const originalRequest = error.config;
     
     // 如果是401错误且不是刷新令牌的请求
@@ -102,7 +124,8 @@ request.interceptors.response.use(
           return request(originalRequest);
         }
       } catch (refreshError) {
-        // 刷新令牌失败，清除所有令牌并跳转到登录页
+        console.error('刷新令牌失败:', refreshError);
+        // 清除令牌并重定向到登录页面
         localStorage.removeItem('token');
         localStorage.removeItem('refresh_token');
         window.location.href = '/login';
@@ -110,42 +133,31 @@ request.interceptors.response.use(
       }
     }
     
+    // 处理其他错误
     if (error.response) {
-      switch (error.response.status) {
-        case 401:
-          // 未授权，清除token并跳转到登录页
-          localStorage.removeItem('token');
-          localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
-          break;
-        case 403:
-          // 权限不足
-          console.error('权限不足');
-          message.error('权限不足');
-          break;
-        case 404:
-          // 请求的资源不存在
-          console.error('请求的资源不存在');
-          message.error('请求的资源不存在');
-          break;
-        case 500:
-          // 服务器错误
-          console.error('服务器错误');
-          message.error('服务器错误');
-          break;
-        default:
-          console.error('请求失败:', error.response.status);
-          message.error('请求失败，请稍后重试');
+      // 服务器返回了错误响应
+      const { status, data } = error.response;
+      
+      // 显示错误消息
+      if (data && data.message) {
+        message.error(data.message);
+      } else if (status === 404) {
+        message.error('请求的资源不存在');
+      } else if (status === 403) {
+        message.error('没有权限执行此操作');
+      } else if (status === 500) {
+        message.error('服务器内部错误');
+      } else {
+        message.error(`请求失败: ${status}`);
       }
     } else if (error.request) {
-      // 请求已发出，但没有收到响应
-      console.error('没有收到响应:', error.request);
-      message.error('网络请求超时，请检查网络连接');
+      // 请求已发送但没有收到响应
+      message.error('无法连接到服务器，请检查网络连接');
     } else {
-      // 请求配置出错
-      console.error('请求配置错误:', error.message);
-      message.error('请求配置错误');
+      // 请求设置时出错
+      message.error(`请求错误: ${error.message}`);
     }
+    
     return Promise.reject(error);
   }
 );

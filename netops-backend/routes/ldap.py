@@ -6,12 +6,26 @@ import ldap3
 from database.session import get_db
 from database.models import LDAPConfig as LDAPConfigModel
 from routes.auth import get_current_active_user, User
+from ldap3 import Server, Connection, ALL, SIMPLE
 
 router = APIRouter(
     prefix="/api/ldap",
     tags=["ldap"],
     responses={404: {"description": "Not found"}},
 )
+
+# 用于测试连接的简单模型
+class LDAPTestConfig(BaseModel):
+    server_url: str
+    bind_dn: str
+    bind_password: str
+    search_base: str
+    use_ssl: bool = False
+
+class LDAPTestResponse(BaseModel):
+    success: bool
+    message: str
+    server_info: Optional[dict] = None
 
 class LDAPConfigBase(BaseModel):
     server_url: str
@@ -24,6 +38,7 @@ class LDAPConfigBase(BaseModel):
     admin_group_dn: Optional[str] = None
     operator_group_dn: Optional[str] = None
     auditor_group_dn: Optional[str] = None
+    use_ssl: bool = False
 
 class LDAPConfigCreate(LDAPConfigBase):
     pass
@@ -36,10 +51,6 @@ class LDAPConfigResponse(LDAPConfigBase):
 
     class Config:
         orm_mode = True
-
-class LDAPTestResponse(BaseModel):
-    success: bool
-    message: str
 
 class LDAPSyncStatus(BaseModel):
     """LDAP同步状态响应模型"""
@@ -127,78 +138,73 @@ async def update_ldap_config(
     return db_config
 
 @router.post("/test-connection", response_model=LDAPTestResponse)
-async def test_ldap_connection(
-    config: LDAPConfigBase = Body(...),
-    current_user: User = Depends(get_current_active_user)
-):
+async def test_ldap_connection(config: LDAPTestConfig):
     """测试LDAP连接"""
-    if current_user.role != "Admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="只有管理员可以测试LDAP连接"
-        )
-    
     try:
-        # 解析服务器URL
-        server_url = config.server_url
-        if server_url.startswith('ldap://'):
-            server_url = server_url[7:]
-        elif server_url.startswith('ldaps://'):
-            server_url = server_url[8:]
-            use_ssl = True
-        else:
-            use_ssl = False
-            
-        # 如果URL包含端口，分离主机和端口
-        if ':' in server_url:
-            host, port_str = server_url.split(':')
-            port = int(port_str)
-        else:
-            host = server_url
-            port = 636 if use_ssl else 389
+        print(f"开始测试LDAP连接...")
+        print(f"服务器地址: {config.server_url}")
+        print(f"基本DN: {config.search_base}")
+        print(f"绑定DN: {config.bind_dn}")
+        print(f"使用SSL: {config.use_ssl}")
         
-        # 初始化LDAP连接
-        server = ldap3.Server(host, port=port, use_ssl=use_ssl)
-        conn = ldap3.Connection(server, user=config.bind_dn, password=config.bind_password)
+        # 添加密码调试信息（测试环境显示明文）
+        original_password = config.bind_password
+        print(f"原始密码: {original_password}")  # 测试环境显示密码
+        print(f"原始密码长度: {len(original_password)}")
+        print(f"原始密码中的特殊字符: {[c for c in original_password if not c.isalnum()]}")
         
-        # 尝试绑定
+        # 解析服务器地址，忽略用户可能输入的端口
+        server_parts = config.server_url.split(':')
+        server_host = server_parts[0]
+        server_port = int(server_parts[1]) if len(server_parts) > 1 else (636 if config.use_ssl else 389)
+        
+        print(f"解析后的服务器信息:")
+        print(f"主机: {server_host}")
+        print(f"端口: {server_port}")
+        
+        # 创建LDAP连接
+        server = Server(server_host, port=server_port, use_ssl=config.use_ssl, get_info=ALL)
+        print(f"LDAP服务器对象创建成功")
+        
+        # 尝试连接 - 直接使用原始密码，不添加双引号
+        print(f"尝试连接到LDAP服务器...")
+        conn = Connection(server, user=config.bind_dn, password=original_password, authentication=SIMPLE)
+        print(f"LDAP连接对象创建成功")
+        
         if not conn.bind():
-            return {
-                "success": False,
-                "message": f"LDAP绑定失败: {conn.result}"
+            print(f"LDAP绑定失败: {conn.result}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"LDAP连接测试失败: {conn.result['description']}"
+            )
+        
+        print(f"LDAP绑定成功")
+        
+        # 获取服务器信息
+        server_info = server.info
+        print(f"获取到服务器信息")
+        
+        # 返回成功响应
+        return LDAPTestResponse(
+            success=True,
+            message="LDAP连接测试成功",
+            server_info={
+                "vendor_name": server_info.vendor_name,
+                "vendor_version": server_info.vendor_version,
+                "protocol_version": server_info.protocol_version,
+                "naming_contexts": server_info.naming_contexts,
+                "supported_controls": server_info.supported_controls,
+                "supported_extensions": server_info.supported_extensions,
+                "supported_sasl_mechanisms": server_info.supported_sasl_mechanisms
             }
+        )
         
-        # 尝试搜索
-        search_filter = "(objectClass=*)"
-        conn.search(config.search_base, search_filter, attributes=['*'])
-        
-        # 关闭连接
-        conn.unbind()
-        
-        return {
-            "success": True,
-            "message": "LDAP连接测试成功"
-        }
-    except ldap3.core.exceptions.LDAPBindError as e:
-        return {
-            "success": False,
-            "message": f"LDAP认证失败：{str(e)}"
-        }
-    except ldap3.core.exceptions.LDAPSocketOpenError as e:
-        return {
-            "success": False,
-            "message": f"LDAP服务器连接失败：{str(e)}"
-        }
-    except ldap3.core.exceptions.LDAPException as e:
-        return {
-            "success": False,
-            "message": f"LDAP错误：{str(e)}"
-        }
     except Exception as e:
-        return {
-            "success": False,
-            "message": f"连接测试失败：{str(e)}"
-        }
+        print(f"LDAP连接测试失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"LDAP连接测试失败: {str(e)}"
+        )
 
 @router.get("/sync-status", response_model=LDAPSyncStatus)
 async def get_sync_status(
