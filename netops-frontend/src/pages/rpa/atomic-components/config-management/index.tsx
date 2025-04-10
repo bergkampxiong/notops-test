@@ -4,6 +4,14 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReloadOutli
 import type { ColumnsType } from 'antd/es/table';
 import styles from './index.module.less';
 import request from '../../../../utils/request';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+// 配置 dayjs 插件
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault('Asia/Shanghai');
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -154,7 +162,7 @@ const ConfigManagement: React.FC = () => {
       title: '更新时间',
       dataIndex: 'updated_at',
       key: 'updated_at',
-      render: (date) => new Date(date).toLocaleString(),
+      render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       title: '操作',

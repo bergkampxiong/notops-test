@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 import os
@@ -28,6 +28,26 @@ from utils.device_connection_manager import device_connection_manager
 
 # 创建应用
 app = FastAPI(title="NetOps API", version="1.0.0")
+
+# 添加中间件来获取真实客户端IP
+@app.middleware("http")
+async def get_real_ip(request: Request, call_next):
+    # 获取真实客户端IP
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        # 如果有多个IP，取第一个（最原始的客户端IP）
+        request.state.client_ip = forwarded_for.split(",")[0].strip()
+    else:
+        # 尝试获取X-Real-IP
+        real_ip = request.headers.get("X-Real-IP")
+        if real_ip:
+            request.state.client_ip = real_ip
+        else:
+            # 如果没有代理头，使用连接IP
+            request.state.client_ip = request.client.host
+    
+    response = await call_next(request)
+    return response
 
 # 配置CORS
 app.add_middleware(

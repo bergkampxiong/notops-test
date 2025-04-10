@@ -6,10 +6,12 @@ from datetime import datetime
 from sqlalchemy import and_
 from sqlalchemy.sql import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import pytz
 
 class ConfigManagementService:
     def __init__(self, db: Session):
         self.db = db
+        self.timezone = pytz.timezone('Asia/Shanghai')
 
     def get_configs(
         self,
@@ -35,9 +37,13 @@ class ConfigManagementService:
             if status:
                 query = query.filter(DBConfigFile.status == status)
             if start_date:
-                query = query.filter(DBConfigFile.created_at >= start_date)
+                # 将输入的时间转换为UTC时间
+                start_date_utc = self.timezone.localize(start_date).astimezone(pytz.UTC)
+                query = query.filter(DBConfigFile.created_at >= start_date_utc)
             if end_date:
-                query = query.filter(DBConfigFile.created_at <= end_date)
+                # 将输入的时间转换为UTC时间
+                end_date_utc = self.timezone.localize(end_date).astimezone(pytz.UTC)
+                query = query.filter(DBConfigFile.created_at <= end_date_utc)
             if template_type:
                 query = query.filter(DBConfigFile.template_type == template_type)
             
@@ -72,7 +78,8 @@ class ConfigManagementService:
 
     def create_config(self, config: ConfigFileCreate, user_id: str = "system") -> ConfigFile:
         try:
-            now = datetime.utcnow()
+            # 使用当前时区的时间
+            now = datetime.now(self.timezone)
             config_dict = config.dict()
             
             # 创建数据库模型
@@ -124,7 +131,8 @@ class ConfigManagementService:
                             setattr(db_config, 'template_type', value)
                         else:
                             setattr(db_config, key, value)
-                db_config.updated_at = datetime.utcnow()
+                # 使用当前时区的时间
+                db_config.updated_at = datetime.now(self.timezone)
                 self.db.commit()
                 self.db.refresh(db_config)
                 
@@ -162,23 +170,20 @@ class ConfigManagementService:
 
     def _convert_to_response_model(self, db_config: DBConfigFile) -> ConfigFile:
         """将数据库模型转换为响应模型"""
-        try:
-            return ConfigFile(
-                id=str(db_config.id),
-                name=db_config.name,
-                template_type=db_config.template_type,
-                content=db_config.content,
-                description=db_config.description,
-                status=db_config.status,
-                device_type=db_config.device_type,
-                tags=[],
-                created_at=db_config.created_at,
-                updated_at=db_config.updated_at,
-                created_by="system",
-                updated_by="system"
-            )
-        except Exception as e:
-            raise Exception(f"转换响应模型失败: {str(e)}")
+        return ConfigFile(
+            id=str(db_config.id),
+            name=db_config.name,
+            template_type=db_config.template_type,
+            content=db_config.content,
+            description=db_config.description,
+            status=db_config.status,
+            device_type=db_config.device_type,
+            tags=[],  # 从数据库获取标签
+            created_at=db_config.created_at,
+            updated_at=db_config.updated_at,
+            created_by="system",  # 从数据库获取创建者
+            updated_by="system"   # 从数据库获取更新者
+        )
 
     def search_configs(
         self,

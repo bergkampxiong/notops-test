@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
 import json
+import pytz
 
 from database.models import AuditLog, User
 
@@ -19,8 +20,12 @@ def log_event(
     user_id = user.id if user else None
     user_name = user.username if user else username
     
+    # 使用带时区的时间
+    timezone = pytz.timezone('Asia/Shanghai')
+    current_time = datetime.now(timezone)
+    
     log_entry = AuditLog(
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=current_time.isoformat(),
         user_id=user_id,
         username=user_name,
         event_type=event_type,

@@ -17,12 +17,15 @@ from auth.audit import log_event
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
 @router.post("/login", response_model=Token)
-async def login_for_access_token(
-    request: Request,
+async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    request: Request = None
 ):
-    """本地用户登录"""
+    """用户登录"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     # 获取用户
     user = db.query(User).filter(User.username == form_data.username).first()
     
@@ -34,7 +37,7 @@ async def login_for_access_token(
                 db=db,
                 event_type="login",
                 user=user,
-                ip_address=request.client.host,
+                ip_address=client_ip,
                 user_agent=request.headers.get("user-agent"),
                 success=False,
                 details={"reason": "Account locked"}
@@ -66,7 +69,7 @@ async def login_for_access_token(
                     db=db,
                     event_type="account_locked",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=client_ip,
                     user_agent=request.headers.get("user-agent"),
                     success=True,
                     details={"reason": "5 failed login attempts", "locked_until": user.locked_until}
@@ -78,7 +81,7 @@ async def login_for_access_token(
             db=db,
             event_type="login",
             username=form_data.username,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Invalid credentials"}
@@ -101,7 +104,7 @@ async def login_for_access_token(
             db=db,
             event_type="login_2fa_required",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -113,7 +116,7 @@ async def login_for_access_token(
             db=db,
             event_type="login_2fa_setup_required",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -138,7 +141,7 @@ async def login_for_access_token(
         db=db,
         event_type="login",
         user=user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -158,6 +161,9 @@ async def ldap_login(
     db: Session = Depends(get_db)
 ):
     """LDAP用户登录"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     user, error = ldap_authenticate(username, password, db)
     
     if not user:
@@ -165,7 +171,7 @@ async def ldap_login(
             db=db,
             event_type="ldap_login",
             username=username,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": error}
@@ -183,7 +189,7 @@ async def ldap_login(
             db=db,
             event_type="ldap_login_2fa_required",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -202,7 +208,7 @@ async def ldap_login(
         db=db,
         event_type="ldap_login",
         user=user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -221,13 +227,16 @@ async def logout(
     db: Session = Depends(get_db)
 ):
     """用户登出"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     # 这里可以实现令牌黑名单等功能
     
     log_event(
         db=db,
         event_type="logout",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -246,13 +255,16 @@ async def setup_totp_endpoint(
     db: Session = Depends(get_db)
 ):
     """设置TOTP"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     totp_data = setup_totp(current_user, db)
     
     log_event(
         db=db,
         event_type="totp_setup",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -274,6 +286,9 @@ async def verify_totp_endpoint(
     db: Session = Depends(get_db)
 ):
     """验证TOTP"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     try:
         print(f"Verifying TOTP for user: {username}, code: {totp_code}")
         
@@ -292,7 +307,7 @@ async def verify_totp_endpoint(
                 db=db,
                 event_type="totp_verify",
                 user=user,
-                ip_address=request.client.host,
+                ip_address=client_ip,
                 user_agent=request.headers.get("user-agent"),
                 success=False,
                 details={"reason": "Invalid TOTP code"}
@@ -309,7 +324,7 @@ async def verify_totp_endpoint(
                 db=db,
                 event_type="totp_enabled",
                 user=user,
-                ip_address=request.client.host,
+                ip_address=client_ip,
                 user_agent=request.headers.get("user-agent"),
                 success=True
             )
@@ -331,7 +346,7 @@ async def verify_totp_endpoint(
             db=db,
             event_type="totp_verify",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -356,7 +371,7 @@ async def verify_totp_endpoint(
                     db=db,
                     event_type="totp_verify",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=client_ip,
                     user_agent=request.headers.get("user-agent"),
                     success=False,
                     details={"error": str(e)}
@@ -374,13 +389,16 @@ async def refresh_access_token(
     db: Session = Depends(get_db)
 ):
     """刷新访问令牌"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     user = verify_refresh_token(refresh_token, db)
     
     if not user:
         log_event(
             db=db,
             event_type="token_refresh",
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Invalid refresh token"}
@@ -401,7 +419,7 @@ async def refresh_access_token(
         db=db,
         event_type="token_refresh",
         user=user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )
@@ -416,13 +434,16 @@ async def revoke_token(
     db: Session = Depends(get_db)
 ):
     """撤销刷新令牌"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     success = revoke_refresh_token(refresh_token, db)
     
     log_event(
         db=db,
         event_type="token_revoke",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=success
     )
@@ -439,13 +460,16 @@ async def revoke_all_tokens(
     db: Session = Depends(get_db)
 ):
     """撤销用户的所有刷新令牌"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     count = revoke_all_user_refresh_tokens(current_user.id, db)
     
     log_event(
         db=db,
         event_type="token_revoke_all",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"count": count}
@@ -459,6 +483,9 @@ async def setup_totp_for_user(
     db: Session = Depends(get_db)
 ):
     """为指定用户设置TOTP"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     try:
         # 打印请求信息
         body = await request.body()
@@ -507,7 +534,7 @@ async def setup_totp_for_user(
             db=db,
             event_type="totp_setup",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -527,7 +554,7 @@ async def setup_totp_for_user(
                     db=db,
                     event_type="totp_setup",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=client_ip,
                     user_agent=request.headers.get("user-agent"),
                     success=False,
                     details={"error": str(e)}
@@ -546,6 +573,9 @@ async def direct_totp_setup(
     db: Session = Depends(get_db)
 ):
     """直接设置TOTP，不需要用户登录，只需要用户名和密码"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     try:
         print(f"Direct TOTP setup for user: {username}")
         
@@ -567,7 +597,7 @@ async def direct_totp_setup(
             db=db,
             event_type="totp_setup",
             user=user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -587,7 +617,7 @@ async def direct_totp_setup(
                     db=db,
                     event_type="totp_setup",
                     user=user,
-                    ip_address=request.client.host,
+                    ip_address=client_ip,
                     user_agent=request.headers.get("user-agent"),
                     success=False,
                     details={"error": str(e)}

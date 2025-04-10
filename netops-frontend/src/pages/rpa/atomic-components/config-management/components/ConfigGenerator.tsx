@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Select, Space, message } from 'antd';
 import { ConfigFile } from '../types';
 import MonacoEditor from '@monaco-editor/react';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+// 配置 dayjs 插件
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault('Asia/Shanghai');
 
 const { TextArea } = Input;
 
@@ -70,7 +78,7 @@ const ConfigGenerator: React.FC<ConfigGeneratorProps> = ({ templates, onSave }) 
 
     try {
       const values = await form.validateFields();
-      const configName = `${selectedTemplate.name}_${values.hostname || 'config'}_${new Date().getTime()}`;
+      const configName = `${selectedTemplate.name}_${values.hostname || 'config'}_${dayjs().format('YYYYMMDDHHmmss')}`;
       
       onSave({
         name: configName,

@@ -3,14 +3,20 @@ import time
 import os
 import json
 import logging
+import pytz
 from datetime import datetime
 from database.config import get_redis_url
 
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S %z'
 )
+
+# 设置日志时区
+logging.Formatter.converter = lambda *args: datetime.now(pytz.timezone('Asia/Shanghai')).timetuple()
+
 logger = logging.getLogger(__name__)
 
 # 创建Celery实例

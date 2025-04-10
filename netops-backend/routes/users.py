@@ -51,6 +51,9 @@ async def get_users(
     db: Session = Depends(get_db)
 ):
     """获取用户列表"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     try:
         print(f"获取用户列表: 用户 {current_user.username}, 角色 {current_user.role}")
         # 手动检查角色
@@ -66,7 +69,7 @@ async def get_users(
             db=db,
             event_type="list_users",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=True
         )
@@ -78,7 +81,7 @@ async def get_users(
             db=db,
             event_type="list_users",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"error": str(e)}
@@ -94,13 +97,16 @@ async def create_user(
     current_user: User = Depends(get_current_active_user)
 ):
     """创建用户"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
         log_event(
             db=db,
             event_type="create_user",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Username already registered", "username": user.username}
@@ -113,7 +119,7 @@ async def create_user(
         db=db,
         event_type="create_user",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": user.username}
@@ -131,6 +137,9 @@ async def disable_user(
     current_user: User = Depends(get_current_active_user)
 ):
     """禁用/启用用户"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     # 查找用户
     user = db.query(User).filter(User.username == username).first()
     if not user:
@@ -138,7 +147,7 @@ async def disable_user(
             db=db,
             event_type="toggle_user_status",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "username": username}
@@ -158,7 +167,7 @@ async def disable_user(
         db=db,
         event_type=f"{action}_user",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": username, "is_active": user.is_active}
@@ -176,13 +185,16 @@ async def reset_password(
     current_user: User = Depends(get_current_active_user)
 ):
     """重置用户密码"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     user = reset_password_service(db, username, new_password)
     if not user:
         log_event(
             db=db,
             event_type="reset_password",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "username": username}
@@ -193,7 +205,7 @@ async def reset_password(
         db=db,
         event_type="reset_password",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": username}
@@ -211,13 +223,16 @@ async def toggle_2fa(
     current_user: User = Depends(get_current_active_user)
 ):
     """启用/禁用2FA"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     user = toggle_2fa_service(db, username, enable)
     if not user:
         log_event(
             db=db,
             event_type="toggle_2fa",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "username": username}
@@ -228,7 +243,7 @@ async def toggle_2fa(
         db=db,
         event_type="toggle_2fa",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": username, "enable": enable}
@@ -246,12 +261,15 @@ async def update_role(
     current_user: User = Depends(get_current_active_user)
 ):
     """更新用户角色"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     if role not in ["Admin", "Operator", "Auditor"]:
         log_event(
             db=db,
             event_type="update_role",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Invalid role", "username": username, "role": role}
@@ -264,7 +282,7 @@ async def update_role(
             db=db,
             event_type="update_role",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "username": username}
@@ -275,7 +293,7 @@ async def update_role(
         db=db,
         event_type="update_role",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": username, "role": role}
@@ -293,13 +311,16 @@ async def update_department(
     current_user: User = Depends(get_current_active_user)
 ):
     """更新用户部门"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     user = update_user_department_service(db, username, department)
     if not user:
         log_event(
             db=db,
             event_type="update_department",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "username": username}
@@ -310,7 +331,7 @@ async def update_department(
         db=db,
         event_type="update_department",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": username, "department": department}
@@ -328,6 +349,9 @@ async def update_user(
     current_user: User = Depends(get_current_active_user)
 ):
     """更新用户信息"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     # 查找用户
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -335,7 +359,7 @@ async def update_user(
             db=db,
             event_type="update_user",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "user_id": user_id}
@@ -348,7 +372,7 @@ async def update_user(
             db=db,
             event_type="update_user",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Cannot modify LDAP user attributes", "user_id": user_id}
@@ -373,7 +397,7 @@ async def update_user(
         db=db,
         event_type="update_user",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"user_id": user_id, "updated_fields": user_update.dict(exclude_unset=True)}
@@ -390,13 +414,16 @@ async def delete_user(
     current_user: User = Depends(get_current_active_user)
 ):
     """删除用户"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     # 不允许删除自己
     if user_delete.username == current_user.username:
         log_event(
             db=db,
             event_type="delete_user",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Cannot delete yourself", "username": user_delete.username}
@@ -410,7 +437,7 @@ async def delete_user(
             db=db,
             event_type="delete_user",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "User not found", "username": user_delete.username}
@@ -425,7 +452,7 @@ async def delete_user(
         db=db,
         event_type="delete_user",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True,
         details={"username": user_delete.username}
@@ -442,13 +469,16 @@ async def change_password(
     current_user: User = Depends(get_current_active_user)
 ):
     """修改当前用户密码"""
+    # 获取客户端IP
+    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
+    
     # 验证旧密码
     if not verify_password(old_password, current_user.hashed_password):
         log_event(
             db=db,
             event_type="change_password",
             user=current_user,
-            ip_address=request.client.host,
+            ip_address=client_ip,
             user_agent=request.headers.get("user-agent"),
             success=False,
             details={"reason": "Invalid old password"}
@@ -494,7 +524,7 @@ async def change_password(
         db=db,
         event_type="change_password",
         user=current_user,
-        ip_address=request.client.host,
+        ip_address=client_ip,
         user_agent=request.headers.get("user-agent"),
         success=True
     )

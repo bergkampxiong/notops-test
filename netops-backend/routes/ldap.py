@@ -7,6 +7,21 @@ from database.session import get_db
 from database.models import LDAPConfig as LDAPConfigModel
 from routes.auth import get_current_active_user, User
 from ldap3 import Server, Connection, ALL, SIMPLE
+import logging
+import pytz
+from datetime import datetime
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S %z'
+)
+
+# 设置日志时区
+logging.Formatter.converter = lambda *args: datetime.now(pytz.timezone('Asia/Shanghai')).timetuple()
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/ldap",
