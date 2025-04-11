@@ -3,13 +3,15 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import jwt
+from typing import Optional
 
 from database.session import get_db
-from database.models import User
+from database.models import User, UsedTOTP, RefreshToken
 from schemas.user import Token
 from auth.authentication import (
     authenticate_user, create_access_token, get_current_active_user,
-    create_refresh_token, verify_refresh_token, revoke_refresh_token, revoke_all_user_refresh_tokens
+    create_refresh_token, verify_refresh_token, revoke_refresh_token, revoke_all_user_refresh_tokens,
+    verify_password
 )
 from auth.ldap_auth import ldap_authenticate
 from auth.totp import setup_totp, generate_qr_code, verify_totp
@@ -18,11 +20,31 @@ from config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
+class LoginForm(OAuth2PasswordRequestForm):
+    """扩展的登录表单，支持TOTP验证码"""
+    def __init__(
+        self,
+        username: str = Body(...),
+        password: str = Body(...),
+        totp_code: Optional[str] = Body(None),
+        grant_type: Optional[str] = Body(None),
+        scope: str = Body(""),
+        client_id: Optional[str] = Body(None),
+        client_secret: Optional[str] = Body(None),
+    ):
+        self.username = username
+        self.password = password
+        self.totp_code = totp_code
+        self.grant_type = grant_type
+        self.scope = scope
+        self.client_id = client_id
+        self.client_secret = client_secret
+
 @router.post("/login", response_model=Token)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db),
-    request: Request = None
+    db: Session = Depends(get_db)
 ):
     """用户登录"""
     # 获取客户端IP
@@ -31,128 +53,107 @@ async def login(
     # 获取用户
     user = db.query(User).filter(User.username == form_data.username).first()
     
-    # 检查用户是否被锁定
-    if user and user.locked_until:
-        lock_time = datetime.fromisoformat(user.locked_until)
-        if lock_time > datetime.utcnow():
-            log_event(
-                db=db,
-                event_type="login",
-                user=user,
-                ip_address=client_ip,
-                user_agent=request.headers.get("user-agent"),
-                success=False,
-                details={"reason": "Account locked"}
-            )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Account locked until {user.locked_until}",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        else:
-            # 锁定时间已过，重置失败次数
-            user.failed_login_attempts = 0
-            user.locked_until = None
-            db.commit()
-    
-    # 验证用户
-    user = authenticate_user(db, form_data.username, form_data.password)
+    # 检查用户是否存在
     if not user:
-        # 增加失败登录尝试次数
-        if user := db.query(User).filter(User.username == form_data.username).first():
-            user.failed_login_attempts += 1
-            
-            # 检查是否需要锁定账号
-            if user.failed_login_attempts >= 5:
-                lock_time = datetime.utcnow() + timedelta(minutes=15)
-                user.locked_until = lock_time.isoformat()
-                
-                log_event(
-                    db=db,
-                    event_type="account_locked",
-                    user=user,
-                    ip_address=client_ip,
-                    user_agent=request.headers.get("user-agent"),
-                    success=True,
-                    details={"reason": "5 failed login attempts", "locked_until": user.locked_until}
-                )
-            
-            db.commit()
-        
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="用户名或密码错误"
+        )
+
+    # 检查密码是否正确
+    if not verify_password(form_data.password, user.hashed_password):
+        # 记录失败的登录尝试
         log_event(
             db=db,
-            event_type="login",
+            event_type="login_failed",
             username=form_data.username,
             ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=False,
-            details={"reason": "Invalid credentials"}
+            details={"reason": "密码错误"},
+            success=False
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="用户名或密码错误"
         )
-    
-    # 检查是否是首次登录（没有last_login记录）
-    is_first_login = user.last_login is None
-    print(f"User {user.username} is_first_login: {is_first_login}, role: {user.role}, is_ldap_user: {user.is_ldap_user}, totp_enabled: {user.totp_enabled}")
-    
-    # 检查是否需要2FA
-    if user.totp_enabled:
-        # 已启用2FA，需要验证
-        print(f"User {user.username} has 2FA enabled, requiring verification")
+
+    # 检查是否是首次登录
+    is_first_login = not user.last_login
+
+    # 如果是首次登录，需要修改密码
+    if is_first_login:
+        # 创建临时访问令牌
+        access_token = create_access_token(
+            data={"sub": user.username},
+            expires_delta=timedelta(minutes=15)  # 临时令牌15分钟有效期
+        )
+        
+        # 记录首次登录事件
         log_event(
             db=db,
-            event_type="login_2fa_required",
+            event_type="first_login",
             user=user,
             ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=True
+            details={"ip": client_ip}
         )
-        return {"access_token": f"2FA_REQUIRED_{user.username}", "token_type": "bearer"}
-    elif is_first_login and user.role in ["Admin", "Operator"] and not user.is_ldap_user and user.username != "admin":
-        # 首次登录的管理员和操作员需要设置2FA，但admin用户除外
-        print(f"User {user.username} is first login and needs to setup 2FA")
-        log_event(
-            db=db,
-            event_type="login_2fa_setup_required",
-            user=user,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=True
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "is_first_login": True
+        }
+
+    # 如果启用了2FA但未提供验证码
+    if user.has_2fa and not form_data.totp_code:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要2FA验证码"
         )
-        return {"access_token": f"2FA_REQUIRED_SETUP_{user.username}", "token_type": "bearer"}
-    
-    # 重置失败登录尝试次数
-    user.failed_login_attempts = 0
-    user.locked_until = None
-    user.last_login = datetime.utcnow().isoformat()
-    db.commit()
-    
+
+    # 如果启用了2FA，验证TOTP
+    if user.has_2fa:
+        if not verify_totp(user.totp_secret, form_data.totp_code):
+            log_event(
+                db=db,
+                event_type="2fa_failed",
+                user=user,
+                ip_address=client_ip,
+                details={"ip": client_ip},
+                success=False
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="2FA验证码错误"
+            )
+
     # 创建访问令牌
-    access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username}
     )
     
     # 创建刷新令牌
-    refresh_token, refresh_token_expires = create_refresh_token(user.id, db)
+    refresh_token = create_refresh_token(
+        data={"sub": user.username},
+        db=db
+    )
     
+    # 更新最后登录时间
+    user.last_login = datetime.utcnow().isoformat()
+    db.commit()
+    
+    # 记录登录成功事件
     log_event(
         db=db,
-        event_type="login",
+        event_type="login_success",
         user=user,
         ip_address=client_ip,
-        user_agent=request.headers.get("user-agent"),
-        success=True
+        details={"ip": client_ip}
     )
     
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "refresh_token": refresh_token,
-        "expires_in": 1800  # 30分钟，单位秒
+        "is_first_login": False
     }
 
 @router.post("/ldap-login")
@@ -185,7 +186,7 @@ async def ldap_login(
         )
     
     # 检查是否需要2FA
-    if user.totp_enabled:
+    if user.has_2fa:
         # 返回需要2FA的标志
         log_event(
             db=db,
@@ -317,9 +318,9 @@ async def verify_totp_endpoint(
             raise HTTPException(status_code=401, detail="Invalid TOTP code")
         
         # 如果用户还没有启用TOTP，则启用它
-        if not user.totp_enabled:
+        if not user.has_2fa:
             print(f"Enabling TOTP for user: {username}")
-            user.totp_enabled = True
+            user.has_2fa = True
             db.commit()
             
             log_event(
@@ -553,7 +554,7 @@ async def setup_totp_for_user(
             raise HTTPException(status_code=404, detail="User not found")
         
         # 检查用户是否已经完全设置了2FA
-        if user.totp_enabled and user.totp_secret:
+        if user.has_2fa and user.totp_secret:
             print(f"User {username} already has TOTP fully enabled")
             raise HTTPException(status_code=400, detail="User already has 2FA enabled")
         
@@ -616,7 +617,7 @@ async def direct_totp_setup(
             raise HTTPException(status_code=401, detail="Incorrect username or password")
         
         # 检查用户是否已经设置了TOTP
-        if user.totp_enabled:
+        if user.has_2fa:
             print(f"User {username} already has TOTP enabled")
             raise HTTPException(status_code=400, detail="TOTP already enabled for this user")
         
@@ -669,6 +670,6 @@ async def get_current_user_info(current_user: User = Depends(get_current_active_
         "department": current_user.department,
         "is_active": current_user.is_active,
         "is_ldap_user": current_user.is_ldap_user,
-        "totp_enabled": current_user.totp_enabled,
+        "has_2fa": current_user.has_2fa,
         "last_login": current_user.last_login
     } 

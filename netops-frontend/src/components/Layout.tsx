@@ -303,7 +303,7 @@ const Layout: React.FC = () => {
   ];
 
   // 只有管理员才能看到系统管理菜单
-  if (userRole === 'Admin') {
+  if (userRole === 'admin') {
     mainMenuItems.push({
       key: 'system',
       icon: <SettingOutlined />,

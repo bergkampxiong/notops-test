@@ -17,9 +17,9 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     department: Optional[str] = None
-    role: Optional[str] = "Operator"
+    role: Optional[str] = "operator"
     is_active: Optional[bool] = True
-    totp_enabled: Optional[bool] = False
+    has_2fa: Optional[bool] = False
 
 class UserInDB(UserBase):
     id: int
@@ -35,7 +35,7 @@ class UserOut(UserBase):
     is_ldap_user: bool
     department: Optional[str]
     role: str
-    totp_enabled: bool
+    has_2fa: bool
     last_login: Optional[str]
     
     class Config:

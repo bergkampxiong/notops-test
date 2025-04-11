@@ -42,7 +42,7 @@ async def read_users_me(current_user: User = Depends(get_current_active_user)):
 
 @router.get("/", response_model=List[UserOut])
 # 暂时移除角色检查以便调试
-# @roles_required(["Admin", "Auditor"])
+# @roles_required(["admin", "auditor"])
 async def get_users(
     request: Request,
     skip: int = 0,
@@ -53,7 +53,7 @@ async def get_users(
     """获取用户列表"""
     try:
         # 手动检查角色
-        if current_user.role not in ["Admin", "Auditor"]:
+        if current_user.role not in ["admin", "auditor"]:
             raise HTTPException(status_code=403, detail="Not authorized")
         
         # 获取所有用户
@@ -63,7 +63,7 @@ async def get_users(
         raise
 
 @router.post("/create")
-@role_required("Admin")
+@role_required("admin")
 async def create_user(
     request: Request,
     user: UserCreate,
@@ -102,7 +102,7 @@ async def create_user(
     return {"detail": "User created successfully"}
 
 @router.post("/disable")
-@role_required("Admin")
+@role_required("admin")
 async def disable_user(
     request: Request,
     username: str = Body(...),
@@ -150,7 +150,7 @@ async def disable_user(
     return {"detail": f"User {action}d successfully"}
 
 @router.post("/reset-password")
-@role_required("Admin")
+@role_required("admin")
 async def reset_password(
     request: Request,
     username: str = Body(...),
@@ -188,7 +188,7 @@ async def reset_password(
     return {"detail": "Password reset successfully"}
 
 @router.post("/toggle-2fa")
-@role_required("Admin")
+@role_required("admin")
 async def toggle_2fa(
     request: Request,
     username: str = Body(...),
@@ -226,7 +226,7 @@ async def toggle_2fa(
     return {"detail": "2FA status updated successfully"}
 
 @router.post("/update-role")
-@role_required("Admin")
+@role_required("admin")
 async def update_role(
     request: Request,
     username: str = Body(...),
@@ -276,7 +276,7 @@ async def update_role(
     return {"detail": "User role updated successfully"}
 
 @router.post("/update-department")
-@role_required("Admin")
+@role_required("admin")
 async def update_department(
     request: Request,
     username: str = Body(...),
@@ -314,7 +314,7 @@ async def update_department(
     return {"detail": "User department updated successfully"}
 
 @router.put("/{user_id}")
-@role_required("Admin")
+@role_required("admin")
 async def update_user(
     user_id: int,
     user_update: UserUpdate,
@@ -380,7 +380,7 @@ async def update_user(
     return {"detail": "User updated successfully"}
 
 @router.post("/delete")
-@role_required("Admin")
+@role_required("admin")
 async def delete_user(
     request: Request,
     user_delete: UserDeleteRequest,

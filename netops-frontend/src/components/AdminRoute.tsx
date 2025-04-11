@@ -13,7 +13,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     const checkAdminStatus = async () => {
       try {
         const response = await request.get('/auth/me');
-        setIsAdmin(response.data.role === 'Admin');
+        setIsAdmin(response.data.role === 'admin');
       } catch (error) {
         setIsAdmin(false);
       }

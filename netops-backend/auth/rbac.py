@@ -81,9 +81,13 @@ def has_permission(user, permission):
     """
     # 基于角色的权限映射
     role_permissions = {
-        "Admin": ["create_user", "disable_user", "reset_password", "toggle_2fa", "view_audit_logs", "configure_ldap"],
-        "Operator": ["view_users", "change_own_password"],
-        "Auditor": ["view_users", "view_audit_logs"]
+        "admin": [
+            "create_user", "disable_user", "reset_password", "toggle_2fa", 
+            "view_audit_logs", "configure_ldap", "manage_system", "view_system",
+            "manage_users", "manage_roles", "manage_security"
+        ],
+        "operator": ["view_users", "change_own_password"],
+        "auditor": ["view_users", "view_audit_logs"]
     }
     
     # 检查用户角色是否具有所需权限

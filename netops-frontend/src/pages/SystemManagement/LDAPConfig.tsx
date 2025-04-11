@@ -13,7 +13,8 @@ import {
 } from 'antd';
 import {
   SaveOutlined,
-  DisconnectOutlined
+  DisconnectOutlined,
+  DeleteOutlined
 } from '@ant-design/icons';
 import request from '../../utils/request';
 
@@ -24,13 +25,7 @@ interface LDAPConfigData {
   bind_dn: string;
   bind_password: string;
   search_base: string;
-  user_search_filter: string;
-  group_search_filter?: string;
-  require_2fa?: boolean;
-  admin_group_dn?: string;
-  operator_group_dn?: string;
-  auditor_group_dn?: string;
-  use_ssl?: boolean;
+  use_ssl: boolean;
 }
 
 const { Title, Text } = Typography;
@@ -159,12 +154,6 @@ const LDAPConfig: React.FC = () => {
         bind_dn: values.bind_dn,
         bind_password: values.bind_password,
         search_base: values.search_base,
-        user_search_filter: values.user_search_filter,
-        group_search_filter: values.group_search_filter,
-        require_2fa: values.require_2fa || false,
-        admin_group_dn: values.admin_group_dn,
-        operator_group_dn: values.operator_group_dn,
-        auditor_group_dn: values.auditor_group_dn,
         use_ssl: values.use_ssl || false
       };
       
@@ -181,6 +170,22 @@ const LDAPConfig: React.FC = () => {
       message.error('LDAP配置保存失败');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!config?.id) {
+      message.error('没有可删除的配置');
+      return;
+    }
+
+    try {
+      await request.delete(`/ldap/config/${config.id}`);
+      message.success('LDAP配置已删除');
+      setConfig(null);
+      form.resetFields();
+    } catch (error) {
+      message.error('删除LDAP配置失败');
     }
   };
 
@@ -204,16 +209,21 @@ const LDAPConfig: React.FC = () => {
             label="服务器地址"
             name="server_url"
             rules={[{ required: true, message: '请输入LDAP服务器地址' }]}
-            tooltip="请输入LDAP服务器的IP地址或域名（不需要输入端口，端口由下方SSL/TLS开关自动决定）"
+            tooltip="LDAP服务器地址，支持以下格式：
+1. IP地址：172.19.128.164
+2. 域名：ldap.example.com
+3. 带端口的地址：172.19.128.164:389
+注意：如果不指定端口，将根据SSL/TLS开关自动使用389(非SSL)或636(SSL)端口"
           >
-            <Input placeholder="例如：172.19.128.164 或 ldap.example.com" />
+            <Input placeholder="例如：172.19.128.164 或 ldap.example.com 或 172.19.128.164:389" />
           </Form.Item>
 
           <Form.Item
             label="基本DN"
             name="search_base"
             rules={[{ required: true, message: '请输入基本DN' }]}
-            tooltip="LDAP基本DN，例如：dc=example,dc=com"
+            tooltip="LDAP基本DN，用于搜索用户和组的基础DN
+例如：dc=example,dc=com"
           >
             <Input placeholder="例如：dc=example,dc=com" />
           </Form.Item>
@@ -222,7 +232,7 @@ const LDAPConfig: React.FC = () => {
             label="绑定DN"
             name="bind_dn"
             rules={[{ required: true, message: '请输入绑定DN' }]}
-            tooltip="LDAP绑定DN，支持以下格式：
+            tooltip="LDAP绑定DN，用于连接LDAP服务器的管理员账号，支持以下格式：
 1. 完整DN：cn=admin,dc=example,dc=com
 2. 纯用户名：admin
 3. DOMAIN\\username：EXAMPLE\\admin
@@ -235,6 +245,7 @@ const LDAPConfig: React.FC = () => {
             label="绑定密码"
             name="bind_password"
             rules={[{ required: true, message: '请输入绑定密码' }]}
+            tooltip="LDAP绑定账号的密码，用于连接LDAP服务器"
           >
             <Input.Password placeholder="请输入LDAP绑定密码" />
           </Form.Item>
@@ -243,11 +254,11 @@ const LDAPConfig: React.FC = () => {
             label="使用SSL/TLS"
             name="use_ssl"
             valuePropName="checked"
+            tooltip="是否使用SSL/TLS加密连接LDAP服务器
+开启后将使用636端口，关闭则使用389端口"
           >
             <Switch />
           </Form.Item>
-
-          <Divider />
 
           <Form.Item>
             <Space>
@@ -266,6 +277,15 @@ const LDAPConfig: React.FC = () => {
               >
                 测试连接
               </Button>
+              {config?.id && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleDelete}
+                >
+                  删除配置
+                </Button>
+              )}
             </Space>
           </Form.Item>
         </Form>

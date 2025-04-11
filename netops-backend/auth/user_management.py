@@ -15,7 +15,7 @@ def create_user(db: Session, user: UserCreate):
         is_ldap_user=False,
         role=user.role if user.role else "Operator",
         department=user.department,
-        totp_enabled=user.totp_enabled if user.totp_enabled is not None else False,
+        has_2fa=user.totp_enabled if user.totp_enabled is not None else False,
         password_changed_at=datetime.utcnow().isoformat()
     )
     
@@ -54,7 +54,7 @@ def toggle_2fa(db: Session, username: str, enable: bool):
     if not user:
         return None
     
-    user.totp_enabled = enable
+    user.has_2fa = enable
     db.commit()
     
     return user

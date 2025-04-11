@@ -29,7 +29,7 @@ async def get_security_settings(
 ):
     """获取安全设置"""
     # 检查用户权限
-    if current_user.role != "Admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"
@@ -79,7 +79,7 @@ async def update_security_settings(
 ):
     """更新安全设置"""
     # 检查用户权限
-    if current_user.role != "Admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions"

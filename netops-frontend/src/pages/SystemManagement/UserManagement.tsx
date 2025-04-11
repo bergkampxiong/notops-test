@@ -36,6 +36,11 @@ const UserManagement: React.FC = () => {
   const [resetPasswordModal, setResetPasswordModal] = useState(false);
   const [resetPasswordForm] = Form.useForm();
 
+  const roleOptions = [
+    { label: '管理员', value: 'admin' },
+    { label: '普通用户', value: 'user' }
+  ];
+
   // 获取用户列表
   const fetchUsers = async () => {
     setLoading(true);
@@ -218,9 +223,9 @@ const UserManagement: React.FC = () => {
       key: 'role',
       render: (role: string) => {
         let color = 'blue';
-        if (role === 'Admin') color = 'red';
-        if (role === 'Auditor') color = 'green';
-        return <Tag color={color}>{role}</Tag>;
+        if (role === 'admin') color = 'red';
+        if (role === 'auditor') color = 'green';
+        return <Tag color={color}>{roleOptions.find(opt => opt.value === role)?.label || role}</Tag>;
       },
     },
     {
@@ -356,7 +361,7 @@ const UserManagement: React.FC = () => {
             <Card>
               <Statistic
                 title="管理员数量"
-                value={users.filter(user => user.role === 'Admin').length}
+                value={users.filter(user => user.role === 'admin').length}
                 prefix={<LockOutlined />}
               />
             </Card>
@@ -435,9 +440,9 @@ const UserManagement: React.FC = () => {
               rules={[{ required: true, message: '请选择角色' }]}
             >
               <Select>
-                <Select.Option value="Admin">管理员</Select.Option>
-                <Select.Option value="Operator">操作员</Select.Option>
-                <Select.Option value="Auditor">审计员</Select.Option>
+                <Select.Option value="admin">管理员</Select.Option>
+                <Select.Option value="operator">操作员</Select.Option>
+                <Select.Option value="auditor">审计员</Select.Option>
               </Select>
             </Form.Item>
             

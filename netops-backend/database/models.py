@@ -1,5 +1,8 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from .base import Base
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -9,19 +12,22 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
+    full_name = Column(String)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False)
+    role = Column(String, default="user")  # admin, operator, auditor, user
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # 新增字段
     is_ldap_user = Column(Boolean, default=False)  # 是否为LDAP用户
     ldap_dn = Column(String, nullable=True)  # LDAP Distinguished Name
     department = Column(String, nullable=True)  # 部门
-    role = Column(String, default="Operator")  # 角色: Admin, Operator, Auditor
     
     # 2FA相关
+    has_2fa = Column(Boolean, default=False)  # 是否启用2FA
     totp_secret = Column(String, nullable=True)  # TOTP密钥
-    totp_enabled = Column(Boolean, default=False)  # 是否启用2FA
-    backup_codes = Column(String, nullable=True)  # 备用验证码，JSON格式存储
     
     # 安全相关
     failed_login_attempts = Column(Integer, default=0)  # 失败登录尝试次数
@@ -59,14 +65,7 @@ class LDAPConfig(Base):
     bind_dn = Column(String)  # 绑定DN
     bind_password = Column(String)  # 绑定密码
     search_base = Column(String)  # 搜索基础
-    user_search_filter = Column(String)  # 用户搜索过滤器
-    group_search_filter = Column(String, nullable=True)  # 组搜索过滤器
-    require_2fa = Column(Boolean, default=False)  # LDAP用户是否强制启用2FA
-    
-    # 角色映射
-    admin_group_dn = Column(String, nullable=True)  # 管理员组DN
-    operator_group_dn = Column(String, nullable=True)  # 操作员组DN
-    auditor_group_dn = Column(String, nullable=True)  # 审计员组DN
+    use_ssl = Column(Boolean, default=False)  # 是否使用SSL
 
 class UsedTOTP(Base):
     __tablename__ = "used_totp"

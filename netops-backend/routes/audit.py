@@ -11,7 +11,7 @@ from auth.audit import get_audit_logs as get_audit_logs_service
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
 @router.get("/logs")
-@roles_required(["Admin", "Auditor"])
+@roles_required(["admin", "auditor"])
 async def get_audit_logs(
     request: Request,
     skip: int = 0,
@@ -47,4 +47,17 @@ async def get_event_types(
     """获取事件类型列表"""
     # 从数据库中获取所有不同的事件类型
     event_types = db.query(AuditLog.event_type).distinct().all()
-    return [event_type[0] for event_type in event_types] 
+    return [event_type[0] for event_type in event_types]
+
+@router.get("/export")
+@roles_required(["admin", "auditor"])
+async def export_audit_logs(
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    event_type: Optional[str] = None,
+    search_text: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    # Implementation of export_audit_logs function
+    pass 
