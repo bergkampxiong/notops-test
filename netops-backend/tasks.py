@@ -4,8 +4,14 @@ import os
 import json
 import logging
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 from database.config import get_redis_url
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from sqlalchemy.orm import Session
+
+from database.session import SessionLocal
+from auth.audit import cleanup_old_logs
 
 # 配置日志
 logging.basicConfig(
@@ -33,6 +39,30 @@ celery_app.conf.update(
     result_serializer='json',
     timezone='Asia/Shanghai',
     enable_utc=True,
+)
+
+# 创建调度器
+scheduler = BackgroundScheduler()
+
+# 清理旧审计日志的任务
+def cleanup_audit_logs_task():
+    """清理超过3个月的审计日志"""
+    try:
+        db = SessionLocal()
+        deleted_count = cleanup_old_logs(db, months=3)
+        logging.info(f"已清理 {deleted_count} 条超过3个月的审计日志")
+    except Exception as e:
+        logging.error(f"清理审计日志失败: {e}")
+    finally:
+        db.close()
+
+# 添加定时任务，每天凌晨2点执行清理
+scheduler.add_job(
+    cleanup_audit_logs_task,
+    CronTrigger(hour=2, minute=0),
+    id='cleanup_audit_logs',
+    name='清理旧审计日志',
+    replace_existing=True
 )
 
 @celery_app.task(name="backup_network_devices")

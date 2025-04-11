@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/audit", tags=["audit"])
 async def get_audit_logs(
     request: Request,
     skip: int = 0,
-    limit: int = 100,
+    limit: Optional[int] = None,
     username: Optional[str] = None,
     event_type: Optional[str] = None,
     start_date: Optional[str] = None,

@@ -26,6 +26,9 @@ from routes.device import router as device_router, connections, ssh_connections
 # 导入连接管理器
 from utils.device_connection_manager import device_connection_manager
 
+# 导入任务
+from tasks import scheduler
+
 # 创建应用
 app = FastAPI(title="NetOps API", version="1.0.0")
 
@@ -115,10 +118,22 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(cleanup_expired_records, 'interval', hours=24)  # 每24小时执行一次
 scheduler.start()
 
-# 应用启动时启动连接管理器
 @app.on_event("startup")
 async def startup_event():
+    """应用启动时执行的操作"""
+    # 初始化数据库
+    init_db()
+    
+    # 启动连接管理器
     await device_connection_manager.start()
+    
+    # 启动调度器（如果尚未启动）
+    try:
+        if not scheduler.running:
+            scheduler.start()
+            print("调度器已启动")
+    except Exception as e:
+        print(f"启动调度器时出错: {e}")
 
 # 根路由
 @app.get("/")
@@ -130,11 +145,15 @@ async def root():
 async def health():
     return {"status": "ok"}
 
-# 应用关闭时停止连接管理器
 @app.on_event("shutdown")
 async def shutdown_event():
-    await device_connection_manager.stop()
+    """应用关闭时执行的操作"""
+    # 停止连接管理器
+    device_connection_manager.stop()
+    
+    # 停止调度器
     scheduler.shutdown()
+    print("调度器已停止")
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():

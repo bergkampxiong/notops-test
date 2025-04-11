@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+import jwt
 
 from database.session import get_db
 from database.models import User
@@ -13,6 +14,7 @@ from auth.authentication import (
 from auth.ldap_auth import ldap_authenticate
 from auth.totp import setup_totp, generate_qr_code, verify_totp
 from auth.audit import log_event
+from config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
@@ -382,100 +384,128 @@ async def verify_totp_endpoint(
         # 抛出通用错误
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
-@router.post("/refresh")
+@router.post("/token/refresh")
 async def refresh_access_token(
     request: Request,
-    refresh_token: str = Body(...),
+    refresh_token: str = Form(...),
     db: Session = Depends(get_db)
 ):
     """刷新访问令牌"""
-    # 获取客户端IP
-    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
-    
-    user = verify_refresh_token(refresh_token, db)
-    
-    if not user:
-        log_event(
-            db=db,
-            event_type="token_refresh",
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=False,
-            details={"reason": "Invalid refresh token"}
+    try:
+        # 验证刷新令牌
+        payload = jwt.decode(
+            refresh_token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
         )
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的刷新令牌"
+            )
+            
+        # 检查令牌是否被撤销
+        if await is_token_revoked(refresh_token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="令牌已被撤销"
+            )
+            
+        # 获取用户信息
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
+            
+        # 生成新的访问令牌
+        access_token = create_access_token(
+            data={"sub": str(user.id)},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+        
+    except jwt.JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="无效的刷新令牌"
         )
-    
-    # 创建新的访问令牌
-    access_token_expires = timedelta(minutes=30)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    
-    log_event(
-        db=db,
-        event_type="token_refresh",
-        user=user,
-        ip_address=client_ip,
-        user_agent=request.headers.get("user-agent"),
-        success=True
-    )
-    
-    return {"access_token": access_token, "token_type": "bearer"}
 
-@router.post("/revoke")
+@router.post("/token/revoke")
 async def revoke_token(
     request: Request,
-    refresh_token: str = Body(...),
-    current_user: User = Depends(get_current_active_user),
+    token: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """撤销刷新令牌"""
-    # 获取客户端IP
-    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
-    
-    success = revoke_refresh_token(refresh_token, db)
-    
-    log_event(
-        db=db,
-        event_type="token_revoke",
-        user=current_user,
-        ip_address=client_ip,
-        user_agent=request.headers.get("user-agent"),
-        success=success
-    )
-    
-    if success:
-        return {"detail": "Token revoked successfully"}
-    else:
-        raise HTTPException(status_code=404, detail="Token not found")
+    """撤销指定的令牌"""
+    try:
+        # 验证令牌
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="无效的令牌"
+            )
+            
+        # 检查令牌是否已经被撤销
+        if await is_token_revoked(token):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="令牌已经被撤销"
+            )
+            
+        # 获取用户信息
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
+            
+        # 撤销令牌
+        await revoke_token_internal(token)
+        
+        return {"message": "令牌已撤销"}
+        
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无效的令牌"
+        )
 
-@router.post("/revoke-all")
+@router.post("/token/revoke-all")
 async def revoke_all_tokens(
     request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """撤销用户的所有刷新令牌"""
-    # 获取客户端IP
-    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
-    
-    count = revoke_all_user_refresh_tokens(current_user.id, db)
-    
-    log_event(
-        db=db,
-        event_type="token_revoke_all",
-        user=current_user,
-        ip_address=client_ip,
-        user_agent=request.headers.get("user-agent"),
-        success=True,
-        details={"count": count}
-    )
-    
-    return {"detail": f"{count} tokens revoked successfully"}
+    """撤销用户的所有令牌"""
+    try:
+        # 获取用户的所有有效令牌
+        tokens = await get_user_tokens(str(current_user.id))
+        
+        # 撤销所有令牌
+        for token in tokens:
+            await revoke_token_internal(token)
+            
+        return {"message": "所有令牌已撤销"}
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @router.post("/totp-setup-for-user")
 async def setup_totp_for_user(

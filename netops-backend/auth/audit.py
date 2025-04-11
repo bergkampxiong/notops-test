@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import pytz
 
@@ -43,7 +43,7 @@ def log_event(
 def get_audit_logs(
     db: Session,
     skip: int = 0,
-    limit: int = 100,
+    limit: int = None,  # 修改为None，表示不限制数量
     username: str = None,
     event_type: str = None,
     start_date: str = None,
@@ -70,6 +70,25 @@ def get_audit_logs(
         query = query.filter(AuditLog.success == success)
     
     # 排序和分页
-    query = query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit)
+    query = query.order_by(AuditLog.timestamp.desc())
     
-    return query.all() 
+    # 应用分页，但如果limit为None则不限制数量
+    if skip > 0:
+        query = query.offset(skip)
+    
+    if limit is not None:
+        query = query.limit(limit)
+    
+    return query.all()
+
+def cleanup_old_logs(db: Session, months: int = 3):
+    """清理超过指定月数的旧日志"""
+    timezone = pytz.timezone('Asia/Shanghai')
+    cutoff_date = datetime.now(timezone) - timedelta(days=months*30)
+    cutoff_date_str = cutoff_date.isoformat()
+    
+    # 删除旧日志
+    deleted_count = db.query(AuditLog).filter(AuditLog.timestamp < cutoff_date_str).delete()
+    db.commit()
+    
+    return deleted_count 
