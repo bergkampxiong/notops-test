@@ -162,20 +162,38 @@ const AuditLogs: React.FC = () => {
     },
     {
       title: '操作',
-      dataIndex: 'action',
-      key: 'action',
-    },
-    {
-      title: '资源',
-      dataIndex: 'resource',
-      key: 'resource',
+      dataIndex: 'event_type',
+      key: 'event_type',
+      render: (event_type: string) => {
+        // 根据事件类型返回对应的中文描述
+        const eventTypeMap: { [key: string]: string } = {
+          'login': '登录',
+          'logout': '登出',
+          'ldap_login': 'LDAP登录',
+          'login_2fa_required': '需要2FA验证',
+          'login_2fa_setup_required': '需要设置2FA',
+          'account_locked': '账户锁定',
+          'totp_setup': '设置2FA',
+          'totp_verify': '验证2FA',
+          'totp_enabled': '启用2FA',
+          'create_user': '创建用户',
+          'delete_user': '删除用户',
+          'update_user': '更新用户',
+          'update_role': '更新角色',
+          'update_department': '更新部门',
+          'toggle_user_status': '切换用户状态',
+          'change_password': '修改密码',
+          'reset_password': '重置密码',
+          'toggle_2fa': '切换2FA状态'
+        };
+        return eventTypeMap[event_type] || event_type;
+      }
     },
     {
       title: '状态',
       dataIndex: 'success',
       key: 'success',
       render: (success: boolean) => {
-        // 根据success值返回对应的标签
         const color = success ? 'green' : 'red';
         const text = success ? '成功' : '失败';
         return <Tag color={color}>{text}</Tag>;
@@ -187,7 +205,7 @@ const AuditLogs: React.FC = () => {
       key: 'ip_address',
     },
     {
-      title: '操作',
+      title: '详情',
       key: 'action',
       render: (_: any, record: AuditLog) => (
         <Button

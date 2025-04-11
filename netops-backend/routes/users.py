@@ -51,41 +51,15 @@ async def get_users(
     db: Session = Depends(get_db)
 ):
     """获取用户列表"""
-    # 获取客户端IP
-    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
-    
     try:
-        print(f"获取用户列表: 用户 {current_user.username}, 角色 {current_user.role}")
         # 手动检查角色
         if current_user.role not in ["Admin", "Auditor"]:
-            print(f"用户 {current_user.username} 角色 {current_user.role} 无权访问用户列表")
             raise HTTPException(status_code=403, detail="Not authorized")
         
         # 获取所有用户
         users = db.query(User).offset(skip).limit(limit).all()
-        print(f"找到 {len(users)} 个用户")
-        
-        log_event(
-            db=db,
-            event_type="list_users",
-            user=current_user,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=True
-        )
-        
         return users
     except Exception as e:
-        print(f"获取用户列表失败: {e}")
-        log_event(
-            db=db,
-            event_type="list_users",
-            user=current_user,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=False,
-            details={"error": str(e)}
-        )
         raise
 
 @router.post("/create")
