@@ -25,6 +25,9 @@ interface User {
   totp_enabled: boolean;
   last_login: string;
   created_at: string;
+  permissions?: {
+    [key: string]: boolean;
+  };
 }
 
 interface LDAPUser {
@@ -136,7 +139,8 @@ const UserManagement: React.FC = () => {
       department: user.department,
       role: user.role,
       is_active: user.is_active,
-      totp_enabled: user.totp_enabled
+      totp_enabled: user.totp_enabled,
+      permissions: user.permissions || {}
     });
     
     setModalVisible(true);
@@ -539,6 +543,73 @@ const UserManagement: React.FC = () => {
                 <div>部门: {ldapUser.department}</div>
               </Card>
             )}
+
+            <Form.Item
+              name="permissions"
+              label="权限设置"
+              tooltip="设置用户的具体权限"
+            >
+              <Card size="small">
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Form.Item
+                    name={['permissions', 'can_view_devices']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="查看设备" unCheckedChildren="查看设备" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_edit_devices']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="编辑设备" unCheckedChildren="编辑设备" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_delete_devices']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="删除设备" unCheckedChildren="删除设备" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_view_credentials']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="查看凭据" unCheckedChildren="查看凭据" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_edit_credentials']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="编辑凭据" unCheckedChildren="编辑凭据" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_delete_credentials']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="删除凭据" unCheckedChildren="删除凭据" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_view_audit_logs']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="查看审计日志" unCheckedChildren="查看审计日志" />
+                  </Form.Item>
+                  <Form.Item
+                    name={['permissions', 'can_export_audit_logs']}
+                    valuePropName="checked"
+                    noStyle
+                  >
+                    <Switch checkedChildren="导出审计日志" unCheckedChildren="导出审计日志" />
+                  </Form.Item>
+                </Space>
+              </Card>
+            </Form.Item>
           </Form>
         </Modal>
         

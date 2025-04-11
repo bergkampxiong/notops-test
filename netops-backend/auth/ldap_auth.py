@@ -110,45 +110,6 @@ def ldap_authenticate(username: str, password: str, db: Session) -> Tuple[Option
         except Exception as e:
             return None, f"用户认证失败：{str(e)}"
             
-        # 检查用户是否在管理员组中
-        is_admin = False
-        is_auditor = False
-        
-        if ldap_config.admin_group_dn:
-            try:
-                admin_filter = f"(&(objectClass=group)(distinguishedName={ldap_config.admin_group_dn}))"
-                admin_result = conn.search_s(
-                    ldap_config.search_base,
-                    ldap.SCOPE_SUBTREE,
-                    admin_filter,
-                    ['member']
-                )
-                if admin_result and admin_result[0][1].get('member'):
-                    is_admin = user_dn in [m.decode('utf-8') for m in admin_result[0][1]['member']]
-            except Exception as e:
-                print(f"检查管理员组成员身份时出错：{str(e)}")
-                
-        if ldap_config.auditor_group_dn:
-            try:
-                auditor_filter = f"(&(objectClass=group)(distinguishedName={ldap_config.auditor_group_dn}))"
-                auditor_result = conn.search_s(
-                    ldap_config.search_base,
-                    ldap.SCOPE_SUBTREE,
-                    auditor_filter,
-                    ['member']
-                )
-                if auditor_result and auditor_result[0][1].get('member'):
-                    is_auditor = user_dn in [m.decode('utf-8') for m in auditor_result[0][1]['member']]
-            except Exception as e:
-                print(f"检查审计员组成员身份时出错：{str(e)}")
-        
-        # 确定用户角色
-        role = "user"
-        if is_admin:
-            role = "admin"
-        elif is_auditor:
-            role = "auditor"
-            
         # 获取用户邮箱和部门
         user_attrs = result[0][1]
         email = user_attrs.get('mail', [b''])[0].decode('utf-8') if user_attrs.get('mail') else None
@@ -157,23 +118,22 @@ def ldap_authenticate(username: str, password: str, db: Session) -> Tuple[Option
         # 查找或创建用户
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            # 创建新用户
+            # 创建新用户时，默认设置为operator角色
             user = User(
                 username=username,
                 email=email,
                 department=department,
                 is_ldap_user=True,
-                role=role,
+                role="operator",  # 默认角色
                 is_active=True
             )
             db.add(user)
             db.commit()
             db.refresh(user)
         else:
-            # 更新现有用户的角色和部门
-            user.role = role
-            user.department = department
+            # 更新现有用户的信息，但保持原有角色不变
             user.email = email
+            user.department = department
             db.commit()
             db.refresh(user)
             

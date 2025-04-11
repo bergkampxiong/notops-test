@@ -31,6 +31,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     totp_enabled: Optional[bool] = None
+    permissions: Optional[dict] = None
 
 # 用户删除请求模型
 class UserDeleteRequest(BaseModel):
@@ -104,7 +105,34 @@ def create_user(
     
     # 创建用户
     try:
-        db_user = create_user_service(db, user)
+        # 创建新用户对象
+        db_user = User(
+            username=user.username,
+            email=user.email,
+            department=user.department,
+            role=user.role,  # 直接使用传入的角色
+            is_active=user.is_active,
+            has_2fa=user.has_2fa,
+            is_ldap_user=user.is_ldap_user
+        )
+        
+        # 如果不是LDAP用户，则设置密码
+        if not user.is_ldap_user:
+            db_user.password = get_password_hash(user.password)
+        
+        # 设置默认值
+        if not db_user.role:
+            db_user.role = "operator"
+        if db_user.is_active is None:
+            db_user.is_active = True
+        if db_user.has_2fa is None:
+            db_user.has_2fa = False
+        
+        # 保存到数据库
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+        
         return db_user
     except HTTPException as e:
         raise e
@@ -365,11 +393,25 @@ async def update_user(
         
         # 只允许更新以下字段
         update_data = user_update.dict(exclude_unset=True)
-        allowed_fields = {"email", "department", "is_active", "role"}
+        allowed_fields = {"email", "department", "is_active", "role", "permissions"}
         update_data = {k: v for k, v in update_data.items() if k in allowed_fields}
         
         # 更新用户信息
         for field, value in update_data.items():
+            if field == "permissions" and value:
+                # 确保权限格式正确
+                if not isinstance(value, dict):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="权限格式不正确，应为字典格式"
+                    )
+                # 验证权限值
+                for perm_key, perm_value in value.items():
+                    if not isinstance(perm_value, bool):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"权限 {perm_key} 的值必须为布尔类型"
+                        )
             setattr(db_user, field, value)
     else:
         # 非LDAP用户可以更新所有字段
@@ -381,6 +423,20 @@ async def update_user(
         
         # 更新用户信息
         for field, value in update_data.items():
+            if field == "permissions" and value:
+                # 确保权限格式正确
+                if not isinstance(value, dict):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="权限格式不正确，应为字典格式"
+                    )
+                # 验证权限值
+                for perm_key, perm_value in value.items():
+                    if not isinstance(perm_value, bool):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"权限 {perm_key} 的值必须为布尔类型"
+                        )
             setattr(db_user, field, value)
     
     try:
