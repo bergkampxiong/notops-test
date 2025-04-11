@@ -302,6 +302,7 @@ def init_ldap_templates(engine):
 def init_ldap_config(engine):
     """初始化LDAP配置表"""
     try:
+        print("开始初始化LDAP配置表...")
         # 创建LDAP配置表
         with engine.connect() as conn:
             conn.execute(text("""
@@ -336,6 +337,7 @@ def init_ldap_config(engine):
 def init_databases():
     """初始化所有数据库表"""
     try:
+        print("开始初始化数据库...")
         # 获取数据库URL
         database_url = get_database_url()
         

@@ -6,7 +6,7 @@ from datetime import datetime
 import re
 
 from database.session import get_db
-from database.models import User, SecuritySettings
+from database.models import User, SecuritySettings, LDAPConfig
 from schemas.user import UserOut, UserCreate
 from auth.authentication import get_current_active_user, verify_password, get_password_hash
 from auth.rbac import role_required, roles_required, permission_required
@@ -20,6 +20,7 @@ from auth.user_management import (
     update_user_department as update_user_department_service
 )
 from auth.audit import log_event
+from utils.ldap_utils import test_ldap_connection
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -62,44 +63,56 @@ async def get_users(
     except Exception as e:
         raise
 
-@router.post("/create")
-@role_required("admin")
-async def create_user(
-    request: Request,
+@router.post("/", response_model=UserOut)
+def create_user(
     user: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """创建用户"""
-    # 获取客户端IP
-    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
-    
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if db_user:
-        log_event(
-            db=db,
-            event_type="create_user",
-            user=current_user,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=False,
-            details={"reason": "Username already registered", "username": user.username}
+    """创建新用户"""
+    # 检查权限
+    if current_user.role not in ["admin", "superuser"]:
+        raise HTTPException(
+            status_code=403,
+            detail="只有管理员可以创建用户"
         )
-        raise HTTPException(status_code=400, detail="Username already registered")
     
-    new_user = create_user_service(db, user)
+    # 如果是LDAP用户，验证LDAP配置
+    if user.is_ldap_user:
+        # 获取LDAP配置
+        ldap_config = db.query(LDAPConfig).first()
+        if not ldap_config:
+            raise HTTPException(
+                status_code=400,
+                detail="LDAP未配置，无法创建LDAP用户"
+            )
+        
+        # 测试LDAP连接
+        try:
+            test_ldap_connection(
+                server_url=ldap_config.server_url,
+                bind_dn=ldap_config.bind_dn,
+                bind_password=ldap_config.bind_password,
+                search_base=ldap_config.search_base,
+                use_ssl=ldap_config.use_ssl
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"LDAP连接测试失败: {str(e)}"
+            )
     
-    log_event(
-        db=db,
-        event_type="create_user",
-        user=current_user,
-        ip_address=client_ip,
-        user_agent=request.headers.get("user-agent"),
-        success=True,
-        details={"username": user.username}
-    )
-    
-    return {"detail": "User created successfully"}
+    # 创建用户
+    try:
+        db_user = create_user_service(db, user)
+        return db_user
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"创建用户失败: {str(e)}"
+        )
 
 @router.post("/disable")
 @role_required("admin")
@@ -313,71 +326,73 @@ async def update_department(
     
     return {"detail": "User department updated successfully"}
 
-@router.put("/{user_id}")
-@role_required("admin")
+@router.put("/{user_id}", response_model=UserOut)
 async def update_user(
     user_id: int,
     user_update: UserUpdate,
-    request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
 ):
     """更新用户信息"""
-    # 获取客户端IP
-    client_ip = request.state.client_ip if hasattr(request.state, 'client_ip') else request.client.host
-    
-    # 查找用户
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        log_event(
-            db=db,
-            event_type="update_user",
-            user=current_user,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=False,
-            details={"reason": "User not found", "user_id": user_id}
+    # 检查权限
+    if current_user.role not in ["admin", "superuser"]:
+        raise HTTPException(
+            status_code=403,
+            detail="没有权限执行此操作"
         )
-        raise HTTPException(status_code=404, detail="User not found")
     
-    # 不允许修改LDAP用户的某些属性
-    if user.is_ldap_user and (user_update.email is not None or user_update.role is not None):
-        log_event(
-            db=db,
-            event_type="update_user",
-            user=current_user,
-            ip_address=client_ip,
-            user_agent=request.headers.get("user-agent"),
-            success=False,
-            details={"reason": "Cannot modify LDAP user attributes", "user_id": user_id}
+    # 获取要更新的用户
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(
+            status_code=404,
+            detail="用户不存在"
         )
-        raise HTTPException(status_code=400, detail="Cannot modify LDAP user attributes")
     
-    # 更新用户信息
-    if user_update.email is not None:
-        user.email = user_update.email
-    if user_update.department is not None:
-        user.department = user_update.department
-    if user_update.role is not None:
-        user.role = user_update.role
-    if user_update.is_active is not None:
-        user.is_active = user_update.is_active
-    if user_update.totp_enabled is not None:
-        user.totp_enabled = user_update.totp_enabled
+    # 如果是LDAP用户，只允许更新部分字段
+    if db_user.is_ldap_user:
+        # 不允许更改用户名和密码
+        if user_update.username and user_update.username != db_user.username:
+            raise HTTPException(
+                status_code=400,
+                detail="不能更改LDAP用户的用户名"
+            )
+        if user_update.password:
+            raise HTTPException(
+                status_code=400,
+                detail="不能更改LDAP用户的密码"
+            )
+        
+        # 只允许更新以下字段
+        update_data = user_update.dict(exclude_unset=True)
+        allowed_fields = {"email", "department", "is_active", "role"}
+        update_data = {k: v for k, v in update_data.items() if k in allowed_fields}
+        
+        # 更新用户信息
+        for field, value in update_data.items():
+            setattr(db_user, field, value)
+    else:
+        # 非LDAP用户可以更新所有字段
+        update_data = user_update.dict(exclude_unset=True)
+        
+        # 如果更新密码，需要哈希处理
+        if "password" in update_data:
+            update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
+        
+        # 更新用户信息
+        for field, value in update_data.items():
+            setattr(db_user, field, value)
     
-    db.commit()
-    
-    log_event(
-        db=db,
-        event_type="update_user",
-        user=current_user,
-        ip_address=client_ip,
-        user_agent=request.headers.get("user-agent"),
-        success=True,
-        details={"user_id": user_id, "updated_fields": user_update.dict(exclude_unset=True)}
-    )
-    
-    return {"detail": "User updated successfully"}
+    try:
+        db.commit()
+        db.refresh(db_user)
+        return db_user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新用户失败: {str(e)}"
+        )
 
 @router.post("/delete")
 @role_required("admin")

@@ -66,6 +66,10 @@ class LDAPConfig(Base):
     bind_password = Column(String)  # 绑定密码
     search_base = Column(String)  # 搜索基础
     use_ssl = Column(Boolean, default=False)  # 是否使用SSL
+    user_search_filter = Column(String, default="(sAMAccountName={username})")  # 用户搜索过滤器
+    admin_group_dn = Column(String, nullable=True)  # 管理员组DN
+    auditor_group_dn = Column(String, nullable=True)  # 审计员组DN
+    require_2fa = Column(Boolean, default=False)  # 是否要求2FA
 
 class UsedTOTP(Base):
     __tablename__ = "used_totp"

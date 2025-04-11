@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel
@@ -21,6 +21,7 @@ from schemas.ldap import (
     LDAPConfigResponse
 )
 from auth.audit import log_event
+from utils.ldap_utils import parse_ldap_url
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -70,6 +71,13 @@ class LDAPSyncStatus(BaseModel):
     total_users: int = 0
     synced_users: int = 0
     error_message: Optional[str] = None
+
+class LDAPUserInfo(BaseModel):
+    """LDAP用户信息响应模型"""
+    username: str
+    email: Optional[str] = None
+    department: Optional[str] = None
+    displayName: Optional[str] = None
 
 @router.get("/config", response_model=LDAPConfigResponse)
 async def get_ldap_config(
@@ -207,61 +215,21 @@ async def delete_ldap_config(
 async def test_ldap_connection(config: LDAPTestConfig):
     """测试LDAP连接"""
     try:
-        # 解析服务器地址
-        server_url = config.server_url
-        if not server_url.startswith(('ldap://', 'ldaps://')):
-            server_url = f"ldap://{server_url}"
+        # 调用ldap_utils中的测试函数
+        from utils.ldap_utils import test_ldap_connection as test_ldap
         
-        # 创建LDAP连接
-        if config.use_ssl:
-            conn = ldap.initialize(f"ldaps://{server_url.replace('ldap://', '').replace('ldaps://', '')}")
-            conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-        else:
-            conn = ldap.initialize(f"ldap://{server_url.replace('ldap://', '').replace('ldaps://', '')}")
-        
-        # 设置连接选项
-        conn.set_option(ldap.OPT_REFERRALS, 0)
-        conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
-        
-        # 尝试绑定
-        conn.simple_bind_s(config.bind_dn, config.bind_password)
-        
-        # 测试搜索
-        search_filter = '(objectClass=*)'
-        search_scope = ldap.SCOPE_BASE
-        search_attrs = ['objectClass']
-        
-        result = conn.search_s(
-            config.search_base,
-            search_scope,
-            search_filter,
-            search_attrs
+        result = test_ldap(
+            server_url=config.server_url,
+            bind_dn=config.bind_dn,
+            bind_password=config.bind_password,
+            search_base=config.search_base,
+            use_ssl=config.use_ssl
         )
         
-        # 关闭连接
-        conn.unbind_s()
-        
         return LDAPTestResponse(
-            success=True,
-            message="LDAP连接测试成功",
-            server_info={
-                "server_url": config.server_url,
-                "bind_dn": config.bind_dn,
-                "search_base": config.search_base,
-                "use_ssl": config.use_ssl
-            }
-        )
-        
-    except ldap.INVALID_CREDENTIALS:
-        return LDAPTestResponse(
-            success=False,
-            message="LDAP认证失败：用户名或密码错误"
-        )
-        
-    except ldap.SERVER_DOWN:
-        return LDAPTestResponse(
-            success=False,
-            message="LDAP连接被拒绝"
+            success=result["success"],
+            message=result["message"],
+            server_info=result.get("server_info")
         )
         
     except Exception as e:
@@ -475,65 +443,118 @@ async def test_ldap_connection(
         )
     
     try:
-        # 解析服务器地址
-        server_url = test_request.server_url
-        if not server_url.startswith(('ldap://', 'ldaps://')):
-            server_url = f"ldap://{server_url}"
+        # 调用ldap_utils中的测试函数
+        from utils.ldap_utils import test_ldap_connection as test_ldap
         
-        # 创建LDAP连接
-        if test_request.use_ssl:
-            conn = ldap.initialize(f"ldaps://{server_url.replace('ldap://', '').replace('ldaps://', '')}")
-            conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-        else:
-            conn = ldap.initialize(f"ldap://{server_url.replace('ldap://', '').replace('ldaps://', '')}")
-        
-        # 设置连接选项
-        conn.set_option(ldap.OPT_REFERRALS, 0)
-        conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
-        
-        # 尝试绑定
-        conn.simple_bind_s(test_request.bind_dn, test_request.bind_password)
-        
-        # 测试搜索
-        search_filter = '(objectClass=*)'
-        search_scope = ldap.SCOPE_BASE
-        search_attrs = ['objectClass']
-        
-        result = conn.search_s(
-            test_request.search_base,
-            search_scope,
-            search_filter,
-            search_attrs
+        result = test_ldap(
+            server_url=test_request.server_url,
+            bind_dn=test_request.bind_dn,
+            bind_password=test_request.bind_password,
+            search_base=test_request.search_base,
+            use_ssl=test_request.use_ssl
         )
         
-        # 关闭连接
-        conn.unbind_s()
-        
         return LDAPTestResponse(
-            success=True,
-            message="LDAP连接测试成功",
-            server_info={
-                "server_url": test_request.server_url,
-                "bind_dn": test_request.bind_dn,
-                "search_base": test_request.search_base,
-                "use_ssl": test_request.use_ssl
-            }
-        )
-        
-    except ldap.INVALID_CREDENTIALS:
-        return LDAPTestResponse(
-            success=False,
-            message="LDAP认证失败：用户名或密码错误"
-        )
-        
-    except ldap.SERVER_DOWN:
-        return LDAPTestResponse(
-            success=False,
-            message="LDAP连接被拒绝"
+            success=result["success"],
+            message=result["message"],
+            server_info=result.get("server_info")
         )
         
     except Exception as e:
         return LDAPTestResponse(
             success=False,
             message=f"LDAP连接测试失败: {str(e)}"
+        )
+
+@router.get("/search", response_model=LDAPUserInfo)
+async def search_ldap_user(
+    username: str = Query(..., description="要搜索的用户名"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """搜索LDAP用户"""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="只有管理员可以搜索LDAP用户"
+        )
+    
+    # 获取LDAP配置
+    config = db.query(LDAPConfigModel).first()
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="未找到LDAP配置"
+        )
+    
+    try:
+        # 解析服务器地址
+        server_info = parse_ldap_url(config.server_url)
+        
+        # 创建LDAP连接
+        if config.use_ssl:
+            conn = ldap.initialize(f"ldaps://{server_info['host']}:{server_info['port']}")
+            conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+        else:
+            conn = ldap.initialize(f"ldap://{server_info['host']}:{server_info['port']}")
+        
+        # 设置连接选项
+        conn.set_option(ldap.OPT_REFERRALS, 0)
+        conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+        
+        # 绑定到LDAP服务器
+        conn.simple_bind_s(config.bind_dn, config.bind_password)
+        
+        # 构建搜索过滤器
+        search_filter = f"(sAMAccountName={username})"
+        
+        # 搜索用户
+        result = conn.search_s(
+            config.search_base,
+            ldap.SCOPE_SUBTREE,
+            search_filter,
+            ['mail', 'department', 'displayName']
+        )
+        
+        # 关闭连接
+        conn.unbind_s()
+        
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="未找到LDAP用户"
+            )
+        
+        # 提取用户信息
+        user_info = result[0][1]  # 获取第一个结果的属性
+        
+        # 安全地获取属性值
+        def get_attr_value(attr_name):
+            if attr_name in user_info:
+                values = user_info[attr_name]
+                if values and len(values) > 0:
+                    return values[0].decode('utf-8')
+            return None
+        
+        return LDAPUserInfo(
+            username=username,
+            email=get_attr_value('mail'),
+            department=get_attr_value('department'),
+            displayName=get_attr_value('displayName')
+        )
+        
+    except ldap.INVALID_CREDENTIALS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="LDAP认证失败"
+        )
+    except ldap.SERVER_DOWN:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="LDAP服务器连接失败"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"搜索LDAP用户失败: {str(e)}"
         ) 

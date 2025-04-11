@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Checkbox, message } from 'antd';
+import { Form, Input, Button, Checkbox, message, Radio } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import request from '../utils/request';
@@ -8,6 +8,7 @@ interface LoginFormValues {
   username: string;
   password: string;
   remember: boolean;
+  loginType: 'local' | 'ldap';
 }
 
 interface LoginResponse {
@@ -19,12 +20,14 @@ interface LoginResponse {
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [loginType, setLoginType] = useState<'local' | 'ldap'>('local');
   const navigate = useNavigate();
 
   const onFinish = async (values: LoginFormValues) => {
     try {
       setLoading(true);
       console.log('Logging in with username:', values.username);
+      console.log('Login type:', loginType);
       
       // 创建表单数据
       const formData = new URLSearchParams();
@@ -95,9 +98,20 @@ const Login: React.FC = () => {
         <h1 className="login-form-title">NetOps平台</h1>
         <Form
           name="login"
-          initialValues={{ remember: true }}
+          initialValues={{ remember: true, loginType: 'local' }}
           onFinish={onFinish}
         >
+          <Form.Item name="loginType">
+            <Radio.Group 
+              onChange={(e) => setLoginType(e.target.value)} 
+              value={loginType}
+              style={{ width: '100%', marginBottom: 16 }}
+            >
+              <Radio.Button value="local" style={{ width: '50%', textAlign: 'center' }}>本地用户</Radio.Button>
+              <Radio.Button value="ldap" style={{ width: '50%', textAlign: 'center' }}>LDAP用户</Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+          
           <Form.Item
             name="username"
             rules={[{ required: true, message: '请输入用户名!' }]}

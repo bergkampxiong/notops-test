@@ -1,7 +1,9 @@
-from ldap3 import Server, Connection, ALL, NTLM
+from ldap3 import Server, Connection, ALL, SIMPLE
 from sqlalchemy.orm import Session
 from datetime import datetime
 import json
+import ldap
+from typing import Tuple, Optional
 
 from database.models import User, LDAPConfig
 
@@ -9,92 +11,178 @@ def get_ldap_config(db: Session):
     """获取LDAP配置"""
     return db.query(LDAPConfig).first()
 
-def ldap_authenticate(username: str, password: str, db: Session):
-    """LDAP认证"""
-    ldap_config = get_ldap_config(db)
-    if not ldap_config:
-        return None, "LDAP configuration not found"
+def ldap_authenticate(username: str, password: str, db: Session) -> Tuple[Optional[User], Optional[str]]:
+    """
+    验证LDAP用户凭据
     
-    try:
-        # 创建LDAP服务器连接
-        server = Server(ldap_config.server_url, get_info=ALL)
+    Args:
+        username: 用户名
+        password: 密码
+        db: 数据库会话
         
-        # 构建用户DN
-        user_filter = ldap_config.user_search_filter.replace("{username}", username)
+    Returns:
+        Tuple[Optional[User], Optional[str]]: (用户对象, 错误信息)
+    """
+    try:
+        # 获取LDAP配置
+        ldap_config = db.query(LDAPConfig).first()
+        if not ldap_config:
+            return None, "LDAP未配置"
+            
+        # 解析服务器URL
+        server_url = ldap_config.server_url
+        if not server_url.startswith(('ldap://', 'ldaps://')):
+            server_url = f"ldap://{server_url}"
+            
+        # 创建LDAP连接
+        conn = ldap.initialize(server_url)
+        conn.set_option(ldap.OPT_REFERRALS, 0)
+        
+        # 设置连接选项
+        if server_url.startswith('ldaps://'):
+            conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+            conn.start_tls_s()
         
         # 尝试绑定
-        conn = Connection(
-            server,
-            user=ldap_config.bind_dn,
-            password=ldap_config.bind_password,
-            authentication=NTLM
-        )
+        try:
+            # 处理特殊字符
+            bind_dn = ldap_config.bind_dn
+            # 转义特殊字符
+            special_chars = ['"', ' ', '(', ')', ',', '+', '=', '<', '>', ';', '\\', '#', '-']
+            for char in special_chars:
+                if char in bind_dn:
+                    bind_dn = bind_dn.replace(char, f'\\{char}')
+            
+            # 尝试不同的bind_dn格式
+            bind_dn_formats = [
+                bind_dn,
+                bind_dn.replace('\\', ''),
+                f"cn={bind_dn}",
+                f"uid={bind_dn}",
+                f"cn={bind_dn},{ldap_config.search_base}"
+            ]
+            
+            bind_success = False
+            for bind_dn_format in bind_dn_formats:
+                try:
+                    conn.simple_bind_s(bind_dn_format, ldap_config.bind_password)
+                    bind_success = True
+                    break
+                except ldap.INVALID_CREDENTIALS:
+                    continue
+                except Exception as e:
+                    print(f"尝试bind_dn格式 {bind_dn_format} 失败: {str(e)}")
+                    continue
+            
+            if not bind_success:
+                return None, "LDAP绑定失败：无效的凭据"
+                
+        except ldap.SERVER_DOWN:
+            return None, "LDAP服务器连接失败"
+        except Exception as e:
+            return None, f"LDAP绑定失败：{str(e)}"
+            
+        # 构建搜索过滤器
+        search_filter = f"(&(objectClass=person)(sAMAccountName={username}))"
         
-        if not conn.bind():
-            return None, "Failed to bind to LDAP server"
-        
-        # 搜索用户
-        conn.search(
-            ldap_config.search_base,
-            user_filter,
-            attributes=['cn', 'mail', 'distinguishedName', 'memberOf']
-        )
-        
-        if len(conn.entries) == 0:
-            return None, "User not found in LDAP"
-        
-        user_dn = conn.entries[0].distinguishedName.value
+        # 执行搜索
+        try:
+            result = conn.search_s(
+                ldap_config.search_base,
+                ldap.SCOPE_SUBTREE,
+                search_filter,
+                ['dn', 'sAMAccountName', 'mail', 'department']
+            )
+        except Exception as e:
+            return None, f"LDAP搜索失败：{str(e)}"
+            
+        if not result:
+            return None, "用户不存在"
+            
+        # 获取用户DN
+        user_dn = result[0][0]
         
         # 尝试使用用户凭据绑定
-        user_conn = Connection(server, user=user_dn, password=password)
-        if not user_conn.bind():
-            return None, "Invalid LDAP credentials"
+        try:
+            conn.simple_bind_s(user_dn, password)
+        except ldap.INVALID_CREDENTIALS:
+            return None, "用户名或密码错误"
+        except Exception as e:
+            return None, f"用户认证失败：{str(e)}"
+            
+        # 检查用户是否在管理员组中
+        is_admin = False
+        is_auditor = False
         
-        # 获取用户信息
-        user_info = {
-            "dn": user_dn,
-            "email": conn.entries[0].mail.value if hasattr(conn.entries[0], 'mail') else None,
-            "groups": conn.entries[0].memberOf.values if hasattr(conn.entries[0], 'memberOf') else []
-        }
+        if ldap_config.admin_group_dn:
+            try:
+                admin_filter = f"(&(objectClass=group)(distinguishedName={ldap_config.admin_group_dn}))"
+                admin_result = conn.search_s(
+                    ldap_config.search_base,
+                    ldap.SCOPE_SUBTREE,
+                    admin_filter,
+                    ['member']
+                )
+                if admin_result and admin_result[0][1].get('member'):
+                    is_admin = user_dn in [m.decode('utf-8') for m in admin_result[0][1]['member']]
+            except Exception as e:
+                print(f"检查管理员组成员身份时出错：{str(e)}")
+                
+        if ldap_config.auditor_group_dn:
+            try:
+                auditor_filter = f"(&(objectClass=group)(distinguishedName={ldap_config.auditor_group_dn}))"
+                auditor_result = conn.search_s(
+                    ldap_config.search_base,
+                    ldap.SCOPE_SUBTREE,
+                    auditor_filter,
+                    ['member']
+                )
+                if auditor_result and auditor_result[0][1].get('member'):
+                    is_auditor = user_dn in [m.decode('utf-8') for m in auditor_result[0][1]['member']]
+            except Exception as e:
+                print(f"检查审计员组成员身份时出错：{str(e)}")
         
         # 确定用户角色
-        role = "Operator"  # 默认角色
-        if ldap_config.admin_group_dn and ldap_config.admin_group_dn in user_info["groups"]:
-            role = "Admin"
-        elif ldap_config.auditor_group_dn and ldap_config.auditor_group_dn in user_info["groups"]:
-            role = "Auditor"
+        role = "user"
+        if is_admin:
+            role = "admin"
+        elif is_auditor:
+            role = "auditor"
+            
+        # 获取用户邮箱和部门
+        user_attrs = result[0][1]
+        email = user_attrs.get('mail', [b''])[0].decode('utf-8') if user_attrs.get('mail') else None
+        department = user_attrs.get('department', [b''])[0].decode('utf-8') if user_attrs.get('department') else None
         
-        # 检查用户是否已存在
-        db_user = db.query(User).filter(User.username == username).first()
-        
-        if db_user:
-            # 更新现有用户
-            db_user.is_ldap_user = True
-            db_user.ldap_dn = user_dn
-            db_user.email = user_info["email"] or db_user.email
-            db_user.role = role
-            db_user.last_login = datetime.utcnow().isoformat()
-        else:
+        # 查找或创建用户
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
             # 创建新用户
-            db_user = User(
+            user = User(
                 username=username,
-                email=user_info["email"],
-                hashed_password="",  # LDAP用户不使用本地密码
-                is_active=True,
+                email=email,
+                department=department,
                 is_ldap_user=True,
-                ldap_dn=user_dn,
                 role=role,
-                last_login=datetime.utcnow().isoformat()
+                is_active=True
             )
-            db.add(db_user)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # 更新现有用户的角色和部门
+            user.role = role
+            user.department = department
+            user.email = email
+            db.commit()
+            db.refresh(user)
+            
+        return user, None
         
-        # 如果LDAP配置要求2FA，则启用
-        if ldap_config.require_2fa and not db_user.totp_enabled:
-            db_user.totp_enabled = True
-        
-        db.commit()
-        
-        return db_user, None
-    
     except Exception as e:
-        return None, str(e) 
+        return None, f"LDAP认证失败：{str(e)}"
+    finally:
+        try:
+            conn.unbind_s()
+        except:
+            pass 

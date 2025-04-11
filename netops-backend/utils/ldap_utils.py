@@ -24,100 +24,111 @@ def parse_ldap_url(url: str) -> Dict[str, Any]:
     except Exception as e:
         raise ValueError(f"无效的LDAP URL格式: {str(e)}")
 
-def test_ldap_connection(server_url: str, bind_dn: str, bind_password: str, search_base: str, use_ssl: bool = False) -> Dict[str, Any]:
+def test_ldap_connection(server_url: str, bind_dn: str, bind_password: str, search_base: str, use_ssl: bool = False) -> dict:
     """测试LDAP连接"""
-    conn = None
     try:
         # 解析服务器地址
-        server_info = parse_ldap_url(server_url)
-        print(f"解析后的服务器信息:\n{json.dumps(server_info, indent=2, ensure_ascii=False)}")
+        if not server_url.startswith(('ldap://', 'ldaps://')):
+            server_url = f"ldap://{server_url}"
+        
+        # 处理绑定DN中的特殊字符
+        # 如果绑定DN包含特殊字符，尝试不同的格式
+        bind_dn_formats = [
+            bind_dn,  # 原始格式
+            bind_dn.replace('"', '\\"'),  # 转义双引号
+            bind_dn.replace(' ', '\\ '),  # 转义空格
+            f'"{bind_dn}"',  # 用双引号包围
+            bind_dn.replace('(', '\\(').replace(')', '\\)'),  # 转义括号
+            bind_dn.replace(',', '\\,'),  # 转义逗号
+            bind_dn.replace('+', '\\+'),  # 转义加号
+            bind_dn.replace('=', '\\='),  # 转义等号
+            bind_dn.replace('<', '\\<').replace('>', '\\>'),  # 转义尖括号
+            bind_dn.replace(';', '\\;'),  # 转义分号
+            bind_dn.replace('\\', '\\\\'),  # 转义反斜杠
+            bind_dn.replace('#', '\\#'),  # 转义井号
+            bind_dn.replace('-', '\\-'),  # 转义连字符
+        ]
+        
+        # 处理密码中的特殊字符
+        # 如果密码包含特殊字符，尝试不同的格式
+        password_formats = [
+            bind_password,  # 原始格式
+            bind_password.replace('"', '\\"'),  # 转义双引号
+            bind_password.replace('\\', '\\\\'),  # 转义反斜杠
+            f'"{bind_password}"',  # 用双引号包围
+        ]
         
         # 创建LDAP连接
-        print("尝试创建LDAP连接...")
         if use_ssl:
-            conn = ldap.initialize(f"ldaps://{server_info['host']}:{server_info['port']}")
+            conn = ldap.initialize(f"ldaps://{server_url.replace('ldap://', '').replace('ldaps://', '')}")
             conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
         else:
-            conn = ldap.initialize(f"ldap://{server_info['host']}:{server_info['port']}")
+            conn = ldap.initialize(f"ldap://{server_url.replace('ldap://', '').replace('ldaps://', '')}")
         
         # 设置连接选项
         conn.set_option(ldap.OPT_REFERRALS, 0)
         conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
         
-        print("LDAP连接对象创建成功")
+        # 尝试不同的绑定DN和密码格式
+        connected = False
+        error_message = ""
         
-        # 尝试绑定
-        print("尝试LDAP绑定...")
-        conn.simple_bind_s(bind_dn, bind_password)
-        print("LDAP绑定成功")
+        for bind_dn_format in bind_dn_formats:
+            if connected:
+                break
+                
+            for password_format in password_formats:
+                try:
+                    # 尝试绑定
+                    conn.simple_bind_s(bind_dn_format, password_format)
+                    
+                    # 测试搜索
+                    search_filter = '(objectClass=*)'
+                    search_scope = ldap.SCOPE_BASE
+                    search_attrs = ['objectClass']
+                    
+                    result = conn.search_s(
+                        search_base,
+                        search_scope,
+                        search_filter,
+                        search_attrs
+                    )
+                    
+                    # 如果成功，标记为已连接
+                    connected = True
+                    break
+                except ldap.INVALID_CREDENTIALS:
+                    error_message = "LDAP认证失败：用户名或密码错误"
+                    continue
+                except ldap.SERVER_DOWN:
+                    error_message = "LDAP连接被拒绝"
+                    continue
+                except Exception as e:
+                    error_message = f"LDAP连接测试失败: {str(e)}"
+                    continue
         
-        # 测试搜索
-        print("尝试LDAP搜索...")
-        search_filter = '(objectClass=*)'
-        search_scope = ldap.SCOPE_BASE
-        search_attrs = ['objectClass']
+        # 关闭连接
+        conn.unbind_s()
         
-        result = conn.search_s(
-            search_base,
-            search_scope,
-            search_filter,
-            search_attrs
-        )
-        
-        print("LDAP搜索成功")
-        
-        return {
-            "status": "success",
-            "message": "LDAP连接测试成功",
-            "details": {
-                "server": {
-                    "host": server_info['host'],
-                    "port": server_info['port']
-                },
-                "bind_dn": bind_dn,
-                "search_base": search_base,
-                "use_ssl": use_ssl
+        if connected:
+            return {
+                "success": True,
+                "message": "LDAP连接测试成功",
+                "server_info": {
+                    "server_url": server_url,
+                    "bind_dn": bind_dn,
+                    "search_base": search_base,
+                    "use_ssl": use_ssl
+                }
             }
-        }
-        
-    except ldap.INVALID_CREDENTIALS:
-        error_msg = "LDAP认证失败：用户名或密码错误"
-        print(f"LDAP错误: {error_msg}")
-        return {
-            "status": "error",
-            "message": error_msg,
-            "details": {
-                "error": error_msg,
-                "suggestion": "请检查绑定DN和密码是否正确"
+        else:
+            return {
+                "success": False,
+                "message": error_message
             }
-        }
-        
-    except ldap.SERVER_DOWN:
-        error_msg = "LDAP连接被拒绝"
-        print(f"LDAP错误: {error_msg}")
-        return {
-            "status": "error",
-            "message": error_msg,
-            "details": {
-                "error": error_msg,
-                "suggestion": "请检查服务器地址和端口是否正确，以及网络连接和防火墙设置"
-            }
-        }
         
     except Exception as e:
-        error_msg = str(e)
-        print(f"未知错误: {error_msg}")
         return {
-            "status": "error",
-            "message": f"发生未知错误：{error_msg}",
-            "details": {
-                "error": error_msg,
-                "suggestion": "请检查系统日志获取更多信息"
-            }
-        }
-        
-    finally:
-        if conn:
-            print("尝试关闭LDAP连接...")
-            conn.unbind_s()
-            print("LDAP连接已关闭") 
+            "success": False,
+            "message": f"LDAP连接测试失败: {str(e)}"
+        } 

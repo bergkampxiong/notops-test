@@ -1,24 +1,41 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
+from fastapi import HTTPException
 
 from database.models import User
 from auth.authentication import get_password_hash
 from schemas.user import UserCreate
 
-def create_user(db: Session, user: UserCreate):
-    """创建用户"""
+def create_user(db: Session, user_data: UserCreate) -> User:
+    """创建新用户"""
+    # 检查用户名是否已存在
+    if db.query(User).filter(User.username == user_data.username).first():
+        raise HTTPException(status_code=400, detail="用户名已存在")
+    
+    # 创建新用户对象
     db_user = User(
-        username=user.username,
-        email=user.email,
-        hashed_password=get_password_hash(user.password),
-        is_active=user.is_active if user.is_active is not None else True,
-        is_ldap_user=False,
-        role=user.role if user.role else "Operator",
-        department=user.department,
-        has_2fa=user.totp_enabled if user.totp_enabled is not None else False,
-        password_changed_at=datetime.utcnow().isoformat()
+        username=user_data.username,
+        email=user_data.email,
+        department=user_data.department,
+        role=user_data.role,
+        is_active=user_data.is_active,
+        has_2fa=user_data.has_2fa,
+        is_ldap_user=user_data.is_ldap_user  # 添加LDAP用户标识
     )
     
+    # 如果不是LDAP用户，则设置密码
+    if not user_data.is_ldap_user:
+        db_user.password = get_password_hash(user_data.password)
+    
+    # 设置默认值
+    if not db_user.role:
+        db_user.role = "operator"
+    if db_user.is_active is None:
+        db_user.is_active = True
+    if db_user.has_2fa is None:
+        db_user.has_2fa = False
+    
+    # 保存到数据库
     db.add(db_user)
     db.commit()
     db.refresh(db_user)

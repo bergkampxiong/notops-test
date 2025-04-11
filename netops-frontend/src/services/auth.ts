@@ -8,6 +8,13 @@ export const login = async (username: string, password: string) => {
 };
 
 /**
+ * LDAP用户登录
+ */
+export const ldapLogin = async (username: string, password: string) => {
+  return request.post('/auth/login', { username, password });
+};
+
+/**
  * 用户登出
  */
 export const logout = async () => {
@@ -38,6 +45,7 @@ export const changePassword = async (oldPassword: string, newPassword: string) =
 // 导出默认对象
 const auth = {
   login,
+  ldapLogin,
   logout,
   refreshToken,
   getCurrentUser,

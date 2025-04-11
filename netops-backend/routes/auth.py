@@ -11,7 +11,7 @@ from schemas.user import Token
 from auth.authentication import (
     authenticate_user, create_access_token, get_current_active_user,
     create_refresh_token, verify_refresh_token, revoke_refresh_token, revoke_all_user_refresh_tokens,
-    verify_password
+    verify_password, ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from auth.ldap_auth import ldap_authenticate
 from auth.totp import setup_totp, generate_qr_code, verify_totp
@@ -55,11 +55,139 @@ async def login(
     
     # 检查用户是否存在
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误"
+        # 尝试LDAP认证
+        ldap_user, ldap_error = ldap_authenticate(form_data.username, form_data.password, db)
+        
+        if ldap_user:
+            # LDAP认证成功
+            user = ldap_user
+            
+            # 检查是否需要2FA
+            if user.has_2fa:
+                # 返回需要2FA的标志
+                log_event(
+                    db=db,
+                    event_type="ldap_login_2fa_required",
+                    user=user,
+                    ip_address=client_ip,
+                    user_agent=request.headers.get("user-agent"),
+                    success=True
+                )
+                return {"access_token": f"2FA_REQUIRED_{user.username}", "token_type": "bearer"}
+            
+            # 创建访问令牌
+            access_token = create_access_token(
+                data={"sub": user.username}
+            )
+            
+            # 创建刷新令牌
+            refresh_token, expires_at = create_refresh_token(
+                user_id=user.id,
+                db=db
+            )
+            
+            # 更新最后登录时间
+            user.last_login = datetime.utcnow().isoformat()
+            db.commit()
+            
+            # 记录登录成功事件
+            log_event(
+                db=db,
+                event_type="ldap_login_success",
+                user=user,
+                ip_address=client_ip,
+                user_agent=request.headers.get("user-agent"),
+                success=True
+            )
+            
+            # 返回令牌
+            return {
+                "access_token": access_token,
+                "token_type": "bearer",
+                "refresh_token": refresh_token,
+                "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            }
+        else:
+            # LDAP认证失败
+            log_event(
+                db=db,
+                event_type="login_failed",
+                username=form_data.username,
+                ip_address=client_ip,
+                details={"reason": "用户名或密码错误", "ldap_error": ldap_error},
+                success=False
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误"
+            )
+    
+    # 如果是LDAP用户，尝试LDAP认证
+    if user.is_ldap_user:
+        ldap_user, ldap_error = ldap_authenticate(form_data.username, form_data.password, db)
+        
+        if not ldap_user:
+            # LDAP认证失败
+            log_event(
+                db=db,
+                event_type="ldap_login_failed",
+                user=user,
+                ip_address=client_ip,
+                details={"reason": ldap_error},
+                success=False
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="LDAP认证失败: " + ldap_error
+            )
+        
+        # 检查是否需要2FA
+        if user.has_2fa:
+            # 返回需要2FA的标志
+            log_event(
+                db=db,
+                event_type="ldap_login_2fa_required",
+                user=user,
+                ip_address=client_ip,
+                user_agent=request.headers.get("user-agent"),
+                success=True
+            )
+            return {"access_token": f"2FA_REQUIRED_{user.username}", "token_type": "bearer"}
+        
+        # 创建访问令牌
+        access_token = create_access_token(
+            data={"sub": user.username}
         )
-
+        
+        # 创建刷新令牌
+        refresh_token, expires_at = create_refresh_token(
+            user_id=user.id,
+            db=db
+        )
+        
+        # 更新最后登录时间
+        user.last_login = datetime.utcnow().isoformat()
+        db.commit()
+        
+        # 记录登录成功事件
+        log_event(
+            db=db,
+            event_type="ldap_login_success",
+            user=user,
+            ip_address=client_ip,
+            user_agent=request.headers.get("user-agent"),
+            success=True
+        )
+        
+        # 返回令牌
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "refresh_token": refresh_token,
+            "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        }
+    
+    # 本地用户认证
     # 检查密码是否正确
     if not verify_password(form_data.password, user.hashed_password):
         # 记录失败的登录尝试
@@ -131,8 +259,8 @@ async def login(
     )
     
     # 创建刷新令牌
-    refresh_token = create_refresh_token(
-        data={"sub": user.username},
+    refresh_token, expires_at = create_refresh_token(
+        user_id=user.id,
         db=db
     )
     

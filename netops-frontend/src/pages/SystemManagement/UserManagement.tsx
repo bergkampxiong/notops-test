@@ -6,7 +6,8 @@ import {
 import { 
   UserOutlined, LockOutlined, SafetyOutlined, 
   EditOutlined, DeleteOutlined, PlusOutlined, 
-  QuestionCircleOutlined, SyncOutlined, StopOutlined, CheckCircleOutlined, UserAddOutlined, TeamOutlined 
+  QuestionCircleOutlined, SyncOutlined, StopOutlined, CheckCircleOutlined, UserAddOutlined, TeamOutlined,
+  SearchOutlined
 } from '@ant-design/icons';
 import request from '../../utils/request';
 
@@ -26,6 +27,13 @@ interface User {
   created_at: string;
 }
 
+interface LDAPUser {
+  username: string;
+  email: string;
+  department: string;
+  displayName: string;
+}
+
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -35,6 +43,9 @@ const UserManagement: React.FC = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [resetPasswordModal, setResetPasswordModal] = useState(false);
   const [resetPasswordForm] = Form.useForm();
+  const [userType, setUserType] = useState<'local' | 'ldap'>('local');
+  const [ldapUser, setLdapUser] = useState<LDAPUser | null>(null);
+  const [searchingLdap, setSearchingLdap] = useState(false);
 
   const roleOptions = [
     { label: '管理员', value: 'admin' },
@@ -78,10 +89,37 @@ const UserManagement: React.FC = () => {
     fetchUsers();
   }, []);
 
+  // 搜索LDAP用户
+  const searchLdapUser = async (username: string) => {
+    setSearchingLdap(true);
+    try {
+      const response = await request.get(`/ldap/search?username=${username}`);
+      if (response.data) {
+        setLdapUser(response.data);
+        // 自动填充表单
+        form.setFieldsValue({
+          email: response.data.email,
+          department: response.data.department
+        });
+      } else {
+        message.warning('未找到LDAP用户');
+        setLdapUser(null);
+      }
+    } catch (error) {
+      console.error('搜索LDAP用户失败:', error);
+      message.error('搜索LDAP用户失败');
+      setLdapUser(null);
+    } finally {
+      setSearchingLdap(false);
+    }
+  };
+
   // 打开创建用户模态框
   const showCreateModal = () => {
     setModalTitle('创建用户');
     setEditingUser(null);
+    setLdapUser(null);
+    setUserType('local');
     form.resetFields();
     setModalVisible(true);
   };
@@ -122,7 +160,11 @@ const UserManagement: React.FC = () => {
         message.success('用户更新成功');
       } else {
         // 创建用户
-        await request.post('/users/create', values);
+        const createData = {
+          ...values,
+          is_ldap_user: userType === 'ldap'
+        };
+        await request.post('/users/', createData);
         message.success('用户创建成功');
       }
       
@@ -393,20 +435,46 @@ const UserManagement: React.FC = () => {
           onCancel={() => setModalVisible(false)}
           okText="确定"
           cancelText="取消"
+          width={600}
         >
           <Form
             form={form}
             layout="vertical"
           >
+            {!editingUser && (
+              <Form.Item
+                name="userType"
+                label="用户类型"
+                rules={[{ required: true, message: '请选择用户类型' }]}
+                initialValue="local"
+              >
+                <Select onChange={(value) => setUserType(value)}>
+                  <Option value="local">本地用户</Option>
+                  <Option value="ldap">LDAP用户</Option>
+                </Select>
+              </Form.Item>
+            )}
+
             <Form.Item
               name="username"
               label="用户名"
               rules={[{ required: true, message: '请输入用户名' }]}
             >
-              <Input prefix={<UserOutlined />} disabled={!!editingUser} />
+              <Input 
+                prefix={<UserOutlined />} 
+                disabled={!!editingUser}
+                suffix={userType === 'ldap' && !editingUser && (
+                  <Button 
+                    type="link" 
+                    icon={<SearchOutlined />} 
+                    onClick={() => searchLdapUser(form.getFieldValue('username'))}
+                    loading={searchingLdap}
+                  />
+                )}
+              />
             </Form.Item>
-            
-            {!editingUser && (
+
+            {userType === 'local' && !editingUser && (
               <Form.Item
                 name="password"
                 label="密码"
@@ -424,14 +492,14 @@ const UserManagement: React.FC = () => {
                 { required: true, message: '请输入邮箱' }
               ]}
             >
-              <Input />
+              <Input disabled={userType === 'ldap' && !!ldapUser} />
             </Form.Item>
             
             <Form.Item
               name="department"
               label="部门"
             >
-              <Input />
+              <Input disabled={userType === 'ldap' && !!ldapUser} />
             </Form.Item>
             
             <Form.Item
@@ -462,6 +530,15 @@ const UserManagement: React.FC = () => {
             >
               <Switch />
             </Form.Item>
+
+            {userType === 'ldap' && ldapUser && (
+              <Card size="small" style={{ marginBottom: 16 }}>
+                <Typography.Text type="secondary">LDAP用户信息</Typography.Text>
+                <div>显示名称: {ldapUser.displayName}</div>
+                <div>邮箱: {ldapUser.email}</div>
+                <div>部门: {ldapUser.department}</div>
+              </Card>
+            )}
           </Form>
         </Modal>
         
