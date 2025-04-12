@@ -147,12 +147,12 @@ async def get_group_members(
 
 # 获取设备类型列表
 @router.get("/device-types")
-async def get_device_types():
-    async with httpx.AsyncClient() as client:
-        response = await client.get("http://localhost:3000/api/cmdb/device-types")
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail="获取设备类型失败")
-        return response.json()
+def get_device_types(db: Session = Depends(get_db)):
+    """获取所有设备类型"""
+    # 从CMDB获取设备类型
+    device_types = db.query(DeviceType).all()
+    # 返回所有设备类型
+    return [{"id": dt.id, "name": dt.name, "description": dt.description} for dt in device_types]
 
 # 获取位置列表
 @router.get("/locations")

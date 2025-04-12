@@ -228,15 +228,12 @@ const MemberManagement: React.FC = () => {
     try {
       const response = await request.get('/api/device/category/device-types');
       console.log('获取到的设备类型列表:', response.data);
-      // 过滤掉英文选项
-      const filteredTypes = response.data.filter((type: DeviceType) => 
-        !['Server', 'Network', 'K8S Node', 'K8S Cluster'].includes(type.name)
-      );
-      setDeviceTypes(filteredTypes);
+      // 使用所有设备类型
+      setDeviceTypes(response.data);
       
       // 创建设备类型ID到名称的映射
       const typeMap: Record<string, string> = {};
-      filteredTypes.forEach((type: DeviceType) => {
+      response.data.forEach((type: DeviceType) => {
         // 确保ID作为字符串存储
         const typeId = String(type.id);
         typeMap[typeId] = type.name;
@@ -655,15 +652,12 @@ const MemberDisplay: React.FC = () => {
     try {
       const response = await request.get('/api/device/category/device-types');
       console.log('获取到的设备类型列表:', response.data);
-      // 过滤掉英文选项
-      const filteredTypes = response.data.filter((type: DeviceType) => 
-        !['Server', 'Network', 'K8S Node', 'K8S Cluster'].includes(type.name)
-      );
-      setDeviceTypes(filteredTypes);
+      // 使用所有设备类型
+      setDeviceTypes(response.data);
       
       // 创建设备类型ID到名称的映射
       const typeMap: Record<string, string> = {};
-      filteredTypes.forEach((type: DeviceType) => {
+      response.data.forEach((type: DeviceType) => {
         // 确保ID作为字符串存储
         const typeId = String(type.id);
         typeMap[typeId] = type.name;
