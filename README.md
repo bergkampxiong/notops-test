@@ -1,15 +1,33 @@
 # NetOps 网络自动化平台
 
 ## 项目简介
-NetOps是一个现代化的网络自动化平台，提供网络设备管理、配置管理、自动化运维等功能。
+NetOps是一个现代化的网络自动化平台，提供网络设备管理、配置管理、自动化运维等功能。支持LDAP认证和细粒度的权限管理。
 
 ## 主要功能
 - 网络设备管理
+  - 设备连接管理
+  - 设备配置管理
+  - 设备状态监控
 - 配置管理
+  - 配置模板管理
+  - 配置版本控制
+  - 配置备份恢复
 - 自动化运维
+  - 任务调度
+  - 批量操作
+  - 自动化脚本
 - 资产管理
+  - CMDB管理
+  - 资产分类
+  - 资产关系
 - 用户认证和授权
+  - LDAP集成
+  - 角色管理
+  - 细粒度权限控制
 - 审计日志
+  - 操作日志
+  - 登录日志
+  - 系统日志
 
 ## 技术栈
 - 后端：Python FastAPI
@@ -17,6 +35,7 @@ NetOps是一个现代化的网络自动化平台，提供网络设备管理、�
 - 数据库：PostgreSQL
 - 缓存：Redis
 - 任务队列：Celery
+- 认证：LDAP/JWT
 
 ## 快速开始
 
@@ -25,6 +44,7 @@ NetOps是一个现代化的网络自动化平台，提供网络设备管理、�
 - Node.js v22.14.0+
 - PostgreSQL 13+
 - Redis 6+
+- LDAP服务器（可选）
 
 ### 安装步骤
 
@@ -45,8 +65,9 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-3. 配置数据库
+3. 配置数据库和LDAP
 - 修改 `database/config.py` 中的数据库连接信息
+- 修改 `auth/ldap_config.py` 中的LDAP配置信息
 - CMDB使用与netops相同的数据库，无需单独配置
 
 4. 初始化数据库
@@ -90,11 +111,20 @@ npm start
 netops/
 ├── netops-backend/          # 后端代码
 │   ├── app/                # 应用代码
+│   ├── auth/               # 认证相关
+│   │   ├── ldap_auth.py   # LDAP认证
+│   │   └── jwt_auth.py    # JWT认证
 │   ├── database/           # 数据库相关
 │   ├── models/             # 数据模型
+│   ├── routes/             # API路由
+│   ├── utils/              # 工具函数
 │   └── tests/              # 测试代码
 └── netops-frontend/        # 前端代码
     ├── src/               # 源代码
+    │   ├── components/    # 组件
+    │   ├── pages/        # 页面
+    │   ├── utils/        # 工具函数
+    │   └── services/     # API服务
     ├── public/            # 静态资源
     └── tests/             # 测试代码
 ```
