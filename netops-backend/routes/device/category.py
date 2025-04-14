@@ -395,4 +395,30 @@ def remove_group_members_batch(
         import traceback
         error_details = traceback.format_exc()
         print(f"批量从分组中移除设备失败: {str(e)}\n{error_details}")
-        raise HTTPException(status_code=500, detail=f"批量从分组中移除设备失败: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"批量从分组中移除设备失败: {str(e)}")
+
+@router.get("/group/{group_id}/member-ips")
+async def get_group_member_ips(
+    group_id: int,
+    db: Session = Depends(get_db)
+):
+    """获取分组成员的所有IP地址"""
+    try:
+        # 查询分组是否存在
+        group = db.query(DeviceGroup).filter(DeviceGroup.id == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="分组不存在")
+            
+        # 查询分组所有成员的IP地址
+        members = db.query(DeviceGroupMember).filter(DeviceGroupMember.group_id == group_id).all()
+        
+        # 提取IP地址列表
+        ip_addresses = [member.device.ip_address for member in members if member.device and member.device.ip_address]
+        
+        return {
+            "group_id": group_id,
+            "group_name": group.name,
+            "ip_addresses": ip_addresses
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 

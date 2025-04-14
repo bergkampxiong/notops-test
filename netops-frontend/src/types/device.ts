@@ -1,11 +1,11 @@
 // 设备分组
 export interface DeviceGroup {
-  id: string;
+  id: number;
   name: string;
   description?: string;
-  memberCount: number;
-  createdAt: string;
-  updatedAt: string;
+  device_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // 设备成员
