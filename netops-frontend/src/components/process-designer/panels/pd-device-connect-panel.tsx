@@ -4,6 +4,7 @@ import { CloudServerOutlined } from '@ant-design/icons';
 import { deviceGroupApi } from '../../../api/device';
 import type { DeviceGroup, DeviceMember } from '../../../types/device';
 import { getSSHConfigs, SSHConfig } from '../../../services/sshConfig';
+import { getCredentials } from '../../../services/credential';
 
 const { Option } = Select;
 
@@ -23,6 +24,7 @@ export const PDDeviceConnectPanel: React.FC<DeviceConnectPanelProps> = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [sshConfigs, setSshConfigs] = useState<SSHConfig[]>([]);
+  const [credentials, setCredentials] = useState<any[]>([]);
   const [deviceGroups, setDeviceGroups] = useState<DeviceGroup[]>([]);
   const [targetType, setTargetType] = useState<'group' | 'single'>('single');
   const [groupIps, setGroupIps] = useState<string[]>([]);
@@ -51,6 +53,10 @@ export const PDDeviceConnectPanel: React.FC<DeviceConnectPanelProps> = ({
       const sshConfigs = await getSSHConfigs();
       setSshConfigs(sshConfigs);
 
+      // 获取认证信息列表
+      const credentialsList = await getCredentials();
+      setCredentials(credentialsList);
+
       // 如果有初始数据，设置表单值
       if (initialData) {
         form.setFieldsValue({
@@ -66,6 +72,23 @@ export const PDDeviceConnectPanel: React.FC<DeviceConnectPanelProps> = ({
     } catch (error) {
       message.error('加载数据失败');
       console.error('加载数据失败:', error);
+    }
+  };
+
+  // 处理SSH配置选择
+  const handleSSHConfigChange = (configId: number) => {
+    const selectedConfig = sshConfigs.find(config => config.id === configId);
+    if (selectedConfig) {
+      // 获取对应的认证信息
+      const credential = credentials.find(cred => cred.id === selectedConfig.credential_id);
+      if (credential) {
+        // 更新表单中的认证信息
+        form.setFieldsValue({
+          username: credential.username,
+          password: credential.password,
+          enable_secret: credential.enable_password
+        });
+      }
     }
   };
 
@@ -108,9 +131,27 @@ export const PDDeviceConnectPanel: React.FC<DeviceConnectPanelProps> = ({
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+      const selectedConfig = sshConfigs.find(config => config.id === values.sshConfigId);
+      const credential = credentials.find(cred => cred.id === selectedConfig?.credential_id);
+
       const saveData = {
         ...values,
-        isConfigured: true
+        isConfigured: true,
+        // 添加认证信息
+        username: credential?.username,
+        password: credential?.password,
+        enable_secret: credential?.enable_password,
+        // 添加SSH配置信息
+        device_type: selectedConfig?.device_type,
+        port: selectedConfig?.port,
+        global_delay_factor: selectedConfig?.global_delay_factor,
+        auth_timeout: selectedConfig?.auth_timeout,
+        banner_timeout: selectedConfig?.banner_timeout,
+        fast_cli: selectedConfig?.fast_cli,
+        session_timeout: selectedConfig?.session_timeout,
+        conn_timeout: selectedConfig?.conn_timeout,
+        keepalive: selectedConfig?.keepalive,
+        verbose: selectedConfig?.verbose
       };
 
       // 根据目标类型清理不需要的字段
@@ -170,6 +211,7 @@ export const PDDeviceConnectPanel: React.FC<DeviceConnectPanelProps> = ({
               value: config.id
             })) || []}
             loading={loading}
+            onChange={handleSSHConfigChange}
           />
         </Form.Item>
 

@@ -472,4 +472,25 @@
 
 .pd-device-connect-node .ant-select-selection-item {
   line-height: 20px;
+}
+
+.pd-netmiko-preview-panel-container {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 400px;
+  background: #fff;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  overflow: auto;
+}
+
+.pd-netmiko-preview-panel {
+  height: 100%;
+}
+
+.pd-netmiko-preview-panel .ant-card-body {
+  height: calc(100% - 57px);
+  overflow: auto;
 } 

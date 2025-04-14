@@ -31,7 +31,7 @@ export const PDValidationPanel: React.FC<PDValidationPanelProps> = ({
     const results: ValidationResult[] = [];
 
     // 1. 检查是否有开始节点
-    const hasStartNode = nodes.some((node) => node.type === 'pd_start');
+    const hasStartNode = nodes.some((node) => node.type === 'start' || node.type === 'pd_start');
     if (!hasStartNode) {
       results.push({
         type: 'error',
@@ -40,7 +40,7 @@ export const PDValidationPanel: React.FC<PDValidationPanelProps> = ({
     }
 
     // 2. 检查是否有结束节点
-    const hasEndNode = nodes.some((node) => node.type === 'pd_end');
+    const hasEndNode = nodes.some((node) => node.type === 'end' || node.type === 'pd_end');
     if (!hasEndNode) {
       results.push({
         type: 'error',
@@ -54,7 +54,7 @@ export const PDValidationPanel: React.FC<PDValidationPanelProps> = ({
         (edge) => edge.source === node.id || edge.target === node.id
       );
 
-      if (node.type === 'pd_start') {
+      if (node.type === 'start' || node.type === 'pd_start') {
         // 开始节点不应该有入边
         const hasIncomingEdge = edges.some((edge) => edge.target === node.id);
         if (hasIncomingEdge) {
@@ -64,7 +64,7 @@ export const PDValidationPanel: React.FC<PDValidationPanelProps> = ({
             nodeId: node.id,
           });
         }
-      } else if (node.type === 'pd_end') {
+      } else if (node.type === 'end' || node.type === 'pd_end') {
         // 结束节点不应该有出边
         const hasOutgoingEdge = edges.some((edge) => edge.source === node.id);
         if (hasOutgoingEdge) {

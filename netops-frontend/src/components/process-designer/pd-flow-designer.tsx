@@ -56,6 +56,8 @@ import { PDConfigBackupNode } from './nodes/pd-config-backup-node';
 import { PDStatusCheckNode } from './nodes/pd-status-check-node';
 import { PDDeviceConnectPanel } from './panels/pd-device-connect-panel';
 import { PDConfigDeployPanel } from './panels/pd-config-deploy-panel';
+import { PDNetmikoPreviewPanel } from './panels/pd-netmiko-preview-panel';
+import { PDValidationPanel } from './panels/pd-validation-panel';
 
 // 节点类型映射
 const nodeTypes = {
@@ -137,6 +139,95 @@ interface PDFlowDesignerProps {
   onDirtyChange?: (isDirty: boolean) => void;
 }
 
+// 验证流程函数
+const validateFlow = (nodes: Node[], edges: Edge[]) => {
+  const results: Array<{ type: 'error' | 'warning' | 'info'; message: string; nodeId?: string }> = [];
+
+  // 1. 检查是否有开始节点
+  const hasStartNode = nodes.some((node) => node.type === 'start' || node.type === 'pd_start');
+  if (!hasStartNode) {
+    results.push({
+      type: 'error',
+      message: '流程缺少开始节点',
+    });
+  }
+
+  // 2. 检查是否有结束节点
+  const hasEndNode = nodes.some((node) => node.type === 'end' || node.type === 'pd_end');
+  if (!hasEndNode) {
+    results.push({
+      type: 'error',
+      message: '流程缺少结束节点',
+    });
+  }
+
+  // 3. 检查节点连接
+  nodes.forEach((node) => {
+    if (node.type === 'start' || node.type === 'pd_start') {
+      // 开始节点不应该有入边
+      const hasIncomingEdge = edges.some((edge) => edge.target === node.id);
+      if (hasIncomingEdge) {
+        results.push({
+          type: 'error',
+          message: '开始节点不应该有入边',
+          nodeId: node.id,
+        });
+      }
+    } else if (node.type === 'end' || node.type === 'pd_end') {
+      // 结束节点不应该有出边
+      const hasOutgoingEdge = edges.some((edge) => edge.source === node.id);
+      if (hasOutgoingEdge) {
+        results.push({
+          type: 'error',
+          message: '结束节点不应该有出边',
+          nodeId: node.id,
+        });
+      }
+    } else {
+      // 其他节点应该有入边和出边
+      const hasIncomingEdge = edges.some((edge) => edge.target === node.id);
+      const hasOutgoingEdge = edges.some((edge) => edge.source === node.id);
+
+      if (!hasIncomingEdge) {
+        results.push({
+          type: 'error',
+          message: '节点缺少入边',
+          nodeId: node.id,
+        });
+      }
+      if (!hasOutgoingEdge) {
+        results.push({
+          type: 'error',
+          message: '节点缺少出边',
+          nodeId: node.id,
+        });
+      }
+    }
+  });
+
+  // 4. 检查设备连接节点和配置下发节点的连接
+  const deviceConnectNodes = nodes.filter(node => node.type === 'pd_device_connect');
+  const configDeployNodes = nodes.filter(node => node.type === 'pd_config_deploy');
+
+  deviceConnectNodes.forEach(deviceNode => {
+    // 检查设备连接节点是否有配置下发节点连接
+    const hasConfigDeployEdge = edges.some(edge => 
+      edge.source === deviceNode.id && 
+      configDeployNodes.some(configNode => configNode.id === edge.target)
+    );
+
+    if (!hasConfigDeployEdge) {
+      results.push({
+        type: 'warning',
+        message: '设备连接节点没有连接到配置下发节点',
+        nodeId: deviceNode.id,
+      });
+    }
+  });
+
+  return results;
+};
+
 const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -151,6 +242,9 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
   const [selectedDeviceNode, setSelectedDeviceNode] = useState<Node | null>(null);
   const [showConfigDeployPanel, setShowConfigDeployPanel] = useState(false);
   const [selectedConfigNode, setSelectedConfigNode] = useState<Node | null>(null);
+  const [showNetmikoPreview, setShowNetmikoPreview] = useState(false);
+  const [showValidationPanel, setShowValidationPanel] = useState(false);
+  const [validationResults, setValidationResults] = useState<Array<{ type: 'error' | 'warning' | 'info'; message: string; nodeId?: string }>>([]);
 
   // 处理键盘删除事件
   const onKeyDown = useCallback((event: KeyboardEvent) => {
@@ -307,7 +401,29 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
   };
 
   const handleValidate = () => {
-    message.success('验证通过');
+    // 验证流程
+    const results = validateFlow(nodes, edges);
+    setValidationResults(results);
+    
+    if (results.length === 0) {
+      message.success('验证通过');
+      // 验证通过后显示 Netmiko 代码预览
+      setShowNetmikoPreview(true);
+    } else {
+      // 显示详细的验证错误信息
+      const errorCount = results.filter(r => r.type === 'error').length;
+      const warningCount = results.filter(r => r.type === 'warning').length;
+      
+      if (errorCount > 0) {
+        message.error(`验证失败: ${errorCount}个错误, ${warningCount}个警告`);
+        setShowValidationPanel(true);
+      } else if (warningCount > 0) {
+        message.warning(`验证通过，但有${warningCount}个警告`);
+        setShowValidationPanel(true);
+        // 即使有警告也显示 Netmiko 代码预览
+        setShowNetmikoPreview(true);
+      }
+    }
   };
 
   const handleExecute = () => {
@@ -493,6 +609,26 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
         initialData={selectedConfigNode?.data}
         onSave={handleConfigDeploySave}
       />
+      
+      {showNetmikoPreview && (
+        <div className="pd-netmiko-preview-panel-container">
+          <PDNetmikoPreviewPanel
+            nodes={nodes}
+            edges={edges}
+            onClose={() => setShowNetmikoPreview(false)}
+          />
+        </div>
+      )}
+      
+      {showValidationPanel && (
+        <div className="pd-validation-panel-container">
+          <PDValidationPanel
+            nodes={nodes}
+            edges={edges}
+            onClose={() => setShowValidationPanel(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };
