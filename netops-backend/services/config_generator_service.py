@@ -20,6 +20,19 @@ class ConfigGeneratorService:
         except Exception as e:
             raise Exception(f"获取jinja2模板列表失败: {str(e)}")
 
+    def get_job_templates(self) -> List[ConfigFile]:
+        """获取所有作业类型的模板"""
+        try:
+            # 直接查询作业类型的模板
+            db_configs = self.db.query(DBConfigFile).filter(
+                DBConfigFile.template_type == 'job'
+            ).all()
+            
+            # 转换为响应模型
+            return [self._convert_to_response_model(config) for config in db_configs]
+        except Exception as e:
+            raise Exception(f"获取作业模板列表失败: {str(e)}")
+
     def _convert_to_response_model(self, db_config: DBConfigFile) -> ConfigFile:
         """将数据库模型转换为响应模型"""
         try:

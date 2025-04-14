@@ -55,6 +55,7 @@ import { PDCommandExecuteNode } from './nodes/pd-command-execute-node';
 import { PDConfigBackupNode } from './nodes/pd-config-backup-node';
 import { PDStatusCheckNode } from './nodes/pd-status-check-node';
 import { PDDeviceConnectPanel } from './panels/pd-device-connect-panel';
+import { PDConfigDeployPanel } from './panels/pd-config-deploy-panel';
 
 // 节点类型映射
 const nodeTypes = {
@@ -148,6 +149,8 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
   const previousProcessId = useRef(processId);
   const [showDeviceConnectPanel, setShowDeviceConnectPanel] = useState(false);
   const [selectedDeviceNode, setSelectedDeviceNode] = useState<Node | null>(null);
+  const [showConfigDeployPanel, setShowConfigDeployPanel] = useState(false);
+  const [selectedConfigNode, setSelectedConfigNode] = useState<Node | null>(null);
 
   // 处理键盘删除事件
   const onKeyDown = useCallback((event: KeyboardEvent) => {
@@ -236,6 +239,10 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
     if (node.type === 'deviceConnect') {
       setSelectedDeviceNode(node);
       setShowDeviceConnectPanel(true);
+    }
+    if (node.type === 'configDeploy') {
+      setSelectedConfigNode(node);
+      setShowConfigDeployPanel(true);
     }
     setSelectedNode(node);
   }, []);
@@ -326,6 +333,20 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
       onDirtyChange?.(true);
     }
   }, [selectedDeviceNode, setNodes, onDirtyChange]);
+
+  // 处理配置下发保存
+  const handleConfigDeploySave = useCallback((data: any) => {
+    if (selectedConfigNode) {
+      const updatedNode = {
+        ...selectedConfigNode,
+        data: {
+          ...selectedConfigNode.data,
+          ...data
+        }
+      };
+      setNodes((nds) => nds.map((n) => (n.id === selectedConfigNode.id ? updatedNode : n)));
+    }
+  }, [selectedConfigNode]);
 
   // 加载流程数据
   useEffect(() => {
@@ -461,6 +482,16 @@ const FlowDesigner: React.FC<PDFlowDesignerProps> = ({ processId, onDirtyChange 
         onClose={() => setShowDeviceConnectPanel(false)}
         initialData={selectedDeviceNode?.data}
         onSave={handleDeviceConnectSave}
+      />
+
+      <PDConfigDeployPanel
+        visible={showConfigDeployPanel}
+        onClose={() => {
+          setShowConfigDeployPanel(false);
+          setSelectedConfigNode(null);
+        }}
+        initialData={selectedConfigNode?.data}
+        onSave={handleConfigDeploySave}
       />
     </div>
   );
