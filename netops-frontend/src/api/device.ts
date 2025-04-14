@@ -16,6 +16,10 @@ export const deviceGroupApi = {
   
   // 获取分组所有成员IP
   getMemberIps: (groupId: string) => {
-    return request.get<ApiResponse<{ip_addresses: string[]}>>(`device/category/groups/${groupId}/member-ips`);
+    return request.get<{
+      group_id: number;
+      group_name: string;
+      ip_addresses: string[];
+    }>(`device/category/group/${groupId}/member-ips`);
   }
 }; 

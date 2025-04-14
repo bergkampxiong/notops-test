@@ -409,11 +409,31 @@ async def get_group_member_ips(
         if not group:
             raise HTTPException(status_code=404, detail="分组不存在")
             
-        # 查询分组所有成员的IP地址
+        # 查询分组所有成员
         members = db.query(DeviceGroupMember).filter(DeviceGroupMember.group_id == group_id).all()
         
-        # 提取IP地址列表
-        ip_addresses = [member.device.ip_address for member in members if member.device and member.device.ip_address]
+        # 收集所有设备ID
+        device_ids = [member.device_id for member in members]
+        
+        # 批量获取设备信息
+        ip_addresses = []
+        async with httpx.AsyncClient() as client:
+            # 并行请求所有设备信息
+            tasks = []
+            for device_id in device_ids:
+                tasks.append(client.get(f"http://localhost:3000/api/cmdb/assets/{device_id}", timeout=5.0))
+            
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # 处理响应
+            for response in responses:
+                if isinstance(response, Exception):
+                    continue
+                    
+                if response.status_code == 200:
+                    device_data = response.json()
+                    if device_data.get("ip_address"):
+                        ip_addresses.append(device_data["ip_address"])
         
         return {
             "group_id": group_id,

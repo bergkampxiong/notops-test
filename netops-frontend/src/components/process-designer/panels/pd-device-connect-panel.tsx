@@ -91,11 +91,12 @@ export const PDDeviceConnectPanel: React.FC<DeviceConnectPanelProps> = ({
   const loadGroupIps = async (groupId: string) => {
     try {
       const response = await deviceGroupApi.getMemberIps(groupId);
-      setGroupIps(response.data.data.ip_addresses);
+      // 直接使用response.data，因为API返回的是{group_id, group_name, ip_addresses}
+      setGroupIps(response.data.ip_addresses);
       
       // 自动设置所有IP为选中状态
       form.setFieldsValue({
-        selectedDevices: response.data.data.ip_addresses
+        selectedDevices: response.data.ip_addresses
       });
     } catch (error) {
       console.error('加载分组IP失败:', error);
